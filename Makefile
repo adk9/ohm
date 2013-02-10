@@ -4,7 +4,7 @@ SYSNAME!=uname
 CFLAGS=-Wall -g -I. -Ilibdwarf/libdwarf -Ilibunwind/include/ $(shell pkg-config --cflags lua5.1)
 LFLAGS=-L. $(shell pkg-config --libs lua5.1)
 DWARFLDIR=libdwarf/libdwarf
-UNWINDLDIR=libunwind/src
+UNWINDLDIR=libunwind/src/.libs
 CC=gcc
 
 PROG=\
@@ -32,7 +32,7 @@ whetdc.o: whetdc.c
 	$(CC) $(CFLAGS) -DPRINTOUT -c whetdc.c
 
 doctor: $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/.libs/libunwind.a $(UNWINDLDIR)/.libs/libunwind-x86_64.a dwarf-util.o doctor.o
-	$(CC) -o doctor $(CFLAGS) dwarf-util.o doctor.o $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/.libs/libunwind.a $(UNWINDLDIR)/.libs/libunwind-x86_64.a $(LFLAGS) -ldl -lelf -lm
+	$(CC) -o doctor $(CFLAGS) dwarf-util.o doctor.o $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/libunwind-x86_64.a $(UNWINDLDIR)/libunwind.a $(LFLAGS) -ldl -lelf -lm
 
 symbols: symbols.o
 	$(CC) -o symbols $(CFLAGS) symbols.o $(LFLAGS) -lbfd
