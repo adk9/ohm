@@ -1,0 +1,24 @@
+########################################################################
+# Phony targets are scoped, so you probably want to declare them first.
+#
+
+.PHONY : all distclean clean
+
+SUBCODE_HOME=$(PWD)/subcode/
+
+%.subc.tex : %.tex
+	ruby $(SUBCODE_HOME)/subc.rb $<
+
+%.subc.pdf : %.subc.tex
+	ruby $(SUBCODE_HOME)/pdflatex-bibtex-fixpoint.rb -halt-on-error $*.tex
+	bibtex $*
+
+all : paper.subc.pdf
+
+clean :
+	rm -f *.{log,aux,out} *.subc.tex .subcode_cache*
+
+distclean : clean
+	rm -f *.omc *.subc.pdf 
+
+.DEFAULT : all

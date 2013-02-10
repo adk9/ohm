@@ -1,0 +1,89 @@
+% -*- latex -*-
+%
+%
+%
+
+\documentclass[preprint]{sigplanconf}
+
+\usepackage{cite}
+\usepackage[pdftex]{graphicx}
+\graphicspath{{./images/}}
+\DeclareGraphicsExtensions{.pdf}
+\usepackage{array}
+\usepackage{lcsect}
+\usepackage[cmex10]{amsmath}
+\usepackage{txfonts}
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{stmaryrd}
+\usepackage{proof}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[raggedright]{subfigure}
+\definecolor{darkgreen}{rgb}{0.0,0.5,0.0}
+\definecolor{darkblue}{rgb}{0.0,0.0,0.5}
+\usepackage[pdftex,bookmarks=false,colorlinks=true,linkcolor=darkblue,citecolor=darkblue,urlcolor=darkblue]{hyperref}
+\usepackage{minibox}
+\usepackage{multirow}
+
+\newcommand{\adk}{\textcolor{green}}
+\newcommand{\andrew}{\textcolor{yellow}}
+
+\begin{document}
+
+\title{Execution monitoring}
+
+\authorinfo{Abhishek Kulkarni, Andrew Lumsdaine}
+           {Indiana University}
+           {\texttt{\{}\href{mailto:adkulkar@cs.indiana.edu}{\texttt{adkulkar}},
+             \href{mailto:lums@cs.indiana.edu}{\texttt{lums}}\texttt{\}}\texttt{@cs.indiana.edu}}
+
+\maketitle
+
+%-------------------------------------------------------------------------
+
+\begin{abstract}
+\end{abstract}
+
+\category{D.2.11}{Software Engineering}{Software Architectures}[Languages]
+\category{D.3.2}{Programming Languages}{Language Classifications}[Concurrent, distributed, and parallel languages, Data-Flow languages]
+
+\terms
+Languages, Design, Performance
+
+\keywords
+propagator networks, data-flow programming, reversible computation
+
+%subcode-inline{bnf-inline} regex \{\{(((\}[^\}])|[^\}])*)\}\} name main
+%! R = \rho
+%! |-->* = \mapsto^{*}
+%! |--> = \mapsto
+%! |- = \vdash
+%! ~> = \leadsto
+%! ::= = &\Coloneqq&
+%! * = \times
+%! _(x) = \overline{#x}
+%! is = \rightarrow
+%! exists(x) = \exists{#x}
+%! forall(x) = \forall{#x}
+%! in = \in
+%! empty = \emptyset
+%! neq = \neq
+
+\section{Introduction}
+\label{sec:intro}
+
+The text of the paper begins here.
+
+\section{Related}
+\label{sec:related}
+
+\citep{10.1109/IPDPS.2007.370254}
+
+\bibliographystyle{abbrvnat}
+\bibliography{refs}
+
+\end{document}

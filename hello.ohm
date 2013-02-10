@@ -1,0 +1,3 @@
+pair  = probe {"pair", 1.0}
+
+rule{pair} { function () print(pair[1].a, pair[1].b) end }

@@ -1,0 +1,49 @@
+<[autotemplate]
+documentclass=[compress,blue]{beamer}
+
+usepackage={hyperref}
+usepackage={graphicx}
+usepackage={longtable}
+usepackage={comment}
+usepackage={amsmath}
+usepackage={mdwlist}
+usepackage={txfonts}
+usepackage={xspace}
+usepackage={amstext}
+usepackage={amssymb}
+usepackage={stmaryrd}
+usepackage={proof}
+usepackage={multicol}
+usepackage=[colon]{natbib}
+usepackage=[nodayofweek]{datetime}
+usepackage={etex}
+usepackage=[all,cmtip]{xy}
+
+usetheme={default}
+setbeamertemplate={footline}[page number]
+beamertemplatenavigationsymbolsempty=
+
+title={Online Health Monitoring}
+author={Abhishek Kulkarni}
+
+institute=[Indiana University]{\\ Lab Lunch Talk\\ \tiny Open Systems Lab}
+
+date={Nov 13, 2011}
+
+subject={Debugging programs}
+titleframe=True
+[autotemplate]>
+
+====  ====
+<[center]
+\huge Epic failure is an option!
+-<2> {
+\\ !or is it?!
+}
+[center]>
+
+====  ====
+
+<[center]
+\huge Questions?
+[center]>
