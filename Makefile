@@ -1,8 +1,9 @@
 SYSNAME:=${shell uname}
 SYSNAME!=uname
+LUA=lua-5.2.2
 
-CFLAGS=-Wall -g -I. -Ilibdwarf/libdwarf -Ilibunwind/include/ $(shell pkg-config --cflags lua5.1)
-LFLAGS=-L. $(shell pkg-config --libs lua5.1)
+CFLAGS=-Wall -g -I. -Ilibdwarf/libdwarf -Ilibunwind/include/ $(shell pkg-config --cflags ${LUA})
+LFLAGS=-L. $(shell pkg-config --libs ${LUA})
 DWARFLDIR=libdwarf/libdwarf
 UNWINDLDIR=libunwind/src/.libs
 CC=gcc
