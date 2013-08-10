@@ -1,40 +1,29 @@
-SYSNAME:=${shell uname}
-SYSNAME!=uname
-LUA=lua-5.2.2
-
-CFLAGS=-Wall -g -I. -Ilibdwarf/libdwarf -Ilibunwind/include/ $(shell pkg-config --cflags ${LUA})
-LFLAGS=-L. $(shell pkg-config --libs ${LUA})
-DWARFLDIR=libdwarf/libdwarf
-UNWINDLDIR=libunwind/src/.libs
-CC=gcc
-
-PROG=\
+TGTS=\
 	doctor\
+	benchmarks\
 
-all: $(PROG)
+all: $(TGTS)
 
-$(DWARFLDIR)/libdwarf.a:
-	make -C libdwarf/libdwarf
+libdwarf/libdwarf.a:
+	make -C libdwarf
 
-$(UNWINDLDIR)/libunwind-ptrace.a:
+libunwind/libunwind-ptrace.a:
 	make -C libunwind
 
-$(UNWINDLDIR)/.libs/libunwind.a:
+libunwind/.libs/libunwind.a:
 	make -C libunwind
 
-$(UNWINDLDIR)/.libs/libunwind-x86_64.a:
+libunwind/.libs/libunwind-x86_64.a:
 	make -C libunwind
 
-doctor: $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/.libs/libunwind.a $(UNWINDLDIR)/.libs/libunwind-x86_64.a dwarf-util.o doctor.o
-	$(CC) -o doctor $(CFLAGS) dwarf-util.o doctor.o $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/libunwind-x86_64.a $(UNWINDLDIR)/libunwind.a $(LFLAGS) -ldl -lelf -lm
+doctor: libdwarf/libdwarf.a libunwind/libunwind-ptrace.a libunwind/.libs/libunwind.a libunwind/.libs/libunwind-x86_64.a
+	make -C src
 
-%.o: %.c 
-	$(CC) $(CFLAGS) -c $*.c
+benchmarks:
+	make -C benchmarks
 
 clean:
-	rm -f *.o *~ $(PROG) core.*
-
-nuke:
-	make -C libdwarf/libdwarf clean
+	make -C libdwarf clean
 	make -C libunwind clean
-	make clean
+	make -C src clean
+	make -C benchmarks clean

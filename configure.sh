@@ -16,6 +16,6 @@ conf () {
   popd
 }
 
-conf libdwarf/libdwarf
+conf libdwarf
 conf libunwind
 

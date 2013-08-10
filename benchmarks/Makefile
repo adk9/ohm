@@ -1,6 +1,5 @@
 SYSNAME:=${shell uname}
 SYSNAME!=uname
-CC=gcc
 
 PROG=\
 	whetdc\

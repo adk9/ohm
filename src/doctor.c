@@ -11,7 +11,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
-#include <asm/ptrace.h>
+#ifdef __linux__
+  #include <asm/ptrace.h>
+#endif
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <libunwind-ptrace.h>
