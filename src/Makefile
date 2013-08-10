@@ -1,6 +1,6 @@
 SYSNAME:=${shell uname}
 SYSNAME!=uname
-LUA=lua-5.2.2
+LUA=lua5.1
 
 DWARFDIR=../libdwarf
 UNWINDDIR=../libunwind
