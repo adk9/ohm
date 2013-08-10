@@ -9,7 +9,6 @@ UNWINDLDIR=libunwind/src/.libs
 CC=gcc
 
 PROG=\
-	whetdc\
 	doctor\
 
 all: $(PROG)
@@ -26,17 +25,8 @@ $(UNWINDLDIR)/.libs/libunwind.a:
 $(UNWINDLDIR)/.libs/libunwind-x86_64.a:
 	make -C libunwind
 
-whetdc: whetdc.o
-	$(CC) -o whetdc $(CFLAGS) whetdc.o $(LFLAGS) -lm
-
-whetdc.o: whetdc.c 
-	$(CC) $(CFLAGS) -DPRINTOUT -c whetdc.c
-
 doctor: $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/.libs/libunwind.a $(UNWINDLDIR)/.libs/libunwind-x86_64.a dwarf-util.o doctor.o
 	$(CC) -o doctor $(CFLAGS) dwarf-util.o doctor.o $(DWARFLDIR)/libdwarf.a $(UNWINDLDIR)/libunwind-ptrace.a $(UNWINDLDIR)/libunwind-x86_64.a $(UNWINDLDIR)/libunwind.a $(LFLAGS) -ldl -lelf -lm
-
-symbols: symbols.o
-	$(CC) -o symbols $(CFLAGS) symbols.o $(LFLAGS) -lbfd
 
 %.o: %.c 
 	$(CC) $(CFLAGS) -c $*.c
