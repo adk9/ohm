@@ -43,6 +43,18 @@ Thumbs.db
 *.bbl
 *.blg
 
-libdwarf/*
+config
+aclocal.m4
+configure
+config.status
+libtool
+Makefile
+Makefile.in
+src/.deps
+src/Makefile
+src/Makefile.in
 src/doctor
+benchmarks/Makefile
+benchmarks/Makefile.in
+benchmarks/.deps
 benchmarks/whetdc
