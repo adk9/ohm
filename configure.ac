@@ -1,7 +1,7 @@
-// Copyright (c) 2014, Abhishek Kulkarni
-// All rights reserved. This software may be modified
-// and distributed under the terms of the BSD license.
-// See the COPYING file for details.
+# Copyright (c) 2014, Abhishek Kulkarni
+# All rights reserved. This software may be modified
+# and distributed under the terms of the BSD license.
+# See the COPYING file for details.
 
 AC_PREREQ([2.65])
 AC_INIT([ohm], [1.0], [adkulkar@indiana.edu])
@@ -54,9 +54,10 @@ AC_SEARCH_LIBS([dwarf_tag], [dwarf], [found_libdwarf=yes],
 AC_CHECK_HEADERS([dwarf.h libdwarf.h], [found_libdwarf_hdr=yes; break;])
 AS_IF([test "x$found_libdwarf" != "xyes" -o "x$found_libdwarf_hdr" != "xyes"],
       [AC_MSG_NOTICE([Unable to find libdwarf.h])
-      AC_CONFIG_SUBDIRS([libdwarf])])
-AM_CONDITIONAL([BUILD_LIBDWARF],
-  [test "x$found_libdwarf" != "xyes" -o "x$found_libdwarf_hdr" != "xyes"]])
+       AC_CONFIG_SUBDIRS([libdwarf])
+       build_libdwarf=yes],
+      [build_libdwarf=no])
+AM_CONDITIONAL([BUILD_LIBDWARF], [test "x$build_libdwarf" == "xyes"])
 
 # libunwind
 AC_SEARCH_LIBS([unw_create_addr_space], [unwind unwind-ptrace], [found_libunwind=yes],
@@ -64,9 +65,10 @@ AC_SEARCH_LIBS([unw_create_addr_space], [unwind unwind-ptrace], [found_libunwind
 AC_CHECK_HEADERS([libunwind-ptrace.h], [found_libunwind_hdr=yes; break;])
 AS_IF([test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes"],
       [AC_MSG_NOTICE([Unable to find libunwind headers])
-      AC_CONFIG_SUBDIRS([libunwind])])
-AM_CONDITIONAL([BUILD_LIBUNWIND],
-  [test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes"]])
+       AC_CONFIG_SUBDIRS([libunwind])
+       build_libunwind=yes],
+      [build_libunwind=no])
+AM_CONDITIONAL([BUILD_LIBUNWIND], [test "x$build_libunwind" == "xyes"])
 
 # detect lua
 AX_PROG_LUA([5.0],[],[

@@ -43,6 +43,11 @@ Thumbs.db
 *.bbl
 *.blg
 
+libdwarf/autom4te.cache/
+libdwarf/config.h.in~
+src/.Tpo
+src/libdwarfutil.a
+
 config
 aclocal.m4
 configure

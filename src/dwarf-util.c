@@ -1,5 +1,11 @@
+// Copyright (c) 2014, Abhishek Kulkarni
+// All rights reserved. This software may be modified
+// and distributed under the terms of the BSD license.
+// See the COPYING file for details.
+
 #include <stdlib.h>
 #include <string.h>
+
 #include "dwarf-util.h"
 
 int

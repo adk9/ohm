@@ -1,3 +1,8 @@
+// Copyright (c) 2014, Abhishek Kulkarni
+// All rights reserved. This software may be modified
+// and distributed under the terms of the BSD license.
+// See the COPYING file for details.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +25,9 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <dwarf.h>
 
+#include "doctor.h"
 #include "dwarf-util.h"
 
 #if (!defined(PTRACE_PEEKUSER) && defined(PTRACE_PEEKUSR))
@@ -31,73 +38,27 @@
 # define PTRACE_POKEUSER PTRACE_POKEUSR
 #endif
 
-#define DEFAULT_OHMFILE         "default.ohm"
-#define DEFAULT_INTERVAL        3.0
-#define DEFAULT_NUM_TYPES       64
-#define DEFAULT_NUM_FUNCTIONS   256
-#define DEFAULT_NUM_VARS        256
 
-typedef struct basetypes_t basetypes_t;
-struct basetypes_t
-{
-    int          id;
-    char         name[64];
-    size_t       size;
-    unsigned int nelem;
-};
-
+// Basetype table
 static basetypes_t  types_table[DEFAULT_NUM_TYPES];
 static unsigned int types_table_size;
 
-typedef struct functions_t functions_t;
-struct functions_t
-{
-    char          name[128];
-    unsigned long lowpc;
-    unsigned long hipc;
-};
-
+// Function table
 static functions_t  fns_table[DEFAULT_NUM_FUNCTIONS];
 static unsigned int fns_table_size;
 
-typedef struct variables_t variables_t;
-struct variables_t
-{
-    char          name[256];
-    basetypes_t  *type;
-    functions_t  *function;
-    unsigned int  global;
-    unsigned long addr;
-    signed long   frame_offset;
-};
-
+// Variable table
 static variables_t  vars_table[DEFAULT_NUM_VARS];
 static unsigned int vars_table_size;
 
-typedef struct probe_t probe_t;
-struct probe_t
-{
-    variables_t *var;
-    probe_t     *next;
-};
+// Probes table
+static probe_t     *probes_table;
 
-static probe_t *probes_table;
-
-static double doctor_interval = DEFAULT_INTERVAL;
-static int doctor_debug;
+static double       doctor_interval = DEFAULT_INTERVAL;
+static int          doctor_debug;
 static functions_t *main_fn;
 
 static lua_State *L;
-
-#define derror(format, args...) do {                            \
-        fprintf(stderr, "[ERROR] %s:%d: " format "\n",          \
-                __func__, __LINE__, ##args); } while (0)
-
-#define ddebug(format, args...) do {                            \
-        if (doctor_debug)                                       \
-            fprintf(stderr, "[DEBUG] %s:%d: " format "\n",      \
-                    __func__, __LINE__, ##args); } while (0)
-
 
 // fetch a basetype for an object given its id
 static basetypes_t*
