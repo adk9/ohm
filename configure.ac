@@ -53,18 +53,22 @@ AC_SEARCH_LIBS([dwarf_tag], [dwarf], [found_libdwarf=yes],
                [AC_MSG_NOTICE([libdwarf not found])])
 AC_CHECK_HEADERS([dwarf.h libdwarf.h], [found_libdwarf_hdr=yes; break;])
 AS_IF([test "x$found_libdwarf" != "xyes" -o "x$found_libdwarf_hdr" != "xyes"],
-      [AC_MSG_NOTICE([Unable to find libdwarf.h])
+      [AC_MSG_NOTICE([Unable to find libdwarf. Building internal libdwarf...])
        AC_CONFIG_SUBDIRS([libdwarf])
        build_libdwarf=yes],
       [build_libdwarf=no])
 AM_CONDITIONAL([BUILD_LIBDWARF], [test "x$build_libdwarf" == "xyes"])
 
 # libunwind
-AC_SEARCH_LIBS([unw_create_addr_space], [unwind unwind-ptrace], [found_libunwind=yes],
+AC_SEARCH_LIBS([unw_backtrace], [unwind],
+	       [found_libunwind=yes
+	       LIBS="$LIBS -lunwind -lunwind-generic"],
                [AC_MSG_NOTICE([libunwind not found])])
-AC_CHECK_HEADERS([libunwind-ptrace.h], [found_libunwind_hdr=yes; break;])
+AC_SEARCH_LIBS([_UPT_access_fpreg], [unwind-ptrace], [found_libunwind=yes],
+               [AC_MSG_NOTICE([libunwind-ptrace not found])])
+AC_CHECK_HEADERS([libunwind.h], [found_libunwind_hdr=yes; break;])
 AS_IF([test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes"],
-      [AC_MSG_NOTICE([Unable to find libunwind headers])
+      [AC_MSG_NOTICE([Unable to find libunwind. Building internal libunwind...])
        AC_CONFIG_SUBDIRS([libunwind])
        build_libunwind=yes],
       [build_libunwind=no])
