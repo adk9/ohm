@@ -197,11 +197,6 @@ add_var_location(variables_t *var, Dwarf_Debug dbg, Dwarf_Die die,
     if (!var)
         return;
 
-    if (form == DW_FORM_exprloc) {
-        // TODO: How to deal with exprlocs!
-        return;
-    }
-
     ret = dwarf_loclist_n(attr, &llbufarray, &nelem, &err);
     if (ret == DW_DLV_ERROR) {
         derror("error in dwarf_loclist_n().");
