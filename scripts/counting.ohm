@@ -1,0 +1,4 @@
+i  = probe {"i", 1.0}
+
+rule{i} { function () print("Count = " .. i[1]) end }
+

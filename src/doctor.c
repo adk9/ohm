@@ -706,7 +706,7 @@ int main(int argc, char *argv[])
         ddebug("%d probes requested.", ret);
 
     for (c = 0; c < types_table_size; c++)
-        printf("%d :: %s[%d] %u\n", c, types_table[c].name, types_table[c].nelem, types_table[c].size);
+        printf("%d :: %s[%d] %lu\n", c, types_table[c].name, types_table[c].nelem, types_table[c].size);
 
     print_probes(probes_table);
 

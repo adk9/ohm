@@ -49,17 +49,24 @@ AS_IF([test "x$found_libelf_hdr" != "xyes"],
       [AC_MSG_ERROR([Unable to find libelf.h])])
 
 # libdwarf
+
+AC_ARG_ENABLE([internal-libdwarf],
+  [AS_HELP_STRING([--enable-internal-libdwarf], [Enable Internal libdwarf @<:@default=no@:>@])],
+  [], [enable_internal_libdwarf=yes])
 AC_SEARCH_LIBS([dwarf_tag], [dwarf], [found_libdwarf=yes],
                [AC_MSG_NOTICE([libdwarf not found])])
 AC_CHECK_HEADERS([dwarf.h libdwarf.h], [found_libdwarf_hdr=yes; break;])
-AS_IF([test "x$found_libdwarf" != "xyes" -o "x$found_libdwarf_hdr" != "xyes"],
-      [AC_MSG_NOTICE([Unable to find libdwarf. Building internal libdwarf...])
+AS_IF([test "x$found_libdwarf" != "xyes" -o "x$found_libdwarf_hdr" != "xyes" -o "x$enable_internal_libdwarf" == "xyes"],
+      [AC_MSG_NOTICE([Building internal libdwarf...])
        AC_CONFIG_SUBDIRS([libdwarf])
        build_libdwarf=yes],
       [build_libdwarf=no])
 AM_CONDITIONAL([BUILD_LIBDWARF], [test "x$build_libdwarf" == "xyes"])
 
 # libunwind
+AC_ARG_ENABLE([internal-libunwind],
+  [AS_HELP_STRING([--enable-internal-libunwind], [Enable Internal libunwind @<:@default=no@:>@])],
+  [], [enable_internal_libunwind=yes])
 AC_SEARCH_LIBS([unw_backtrace], [unwind],
 	       [found_libunwind=yes
 	       LIBS="$LIBS -lunwind -lunwind-generic"],
@@ -67,8 +74,8 @@ AC_SEARCH_LIBS([unw_backtrace], [unwind],
 AC_SEARCH_LIBS([_UPT_access_fpreg], [unwind-ptrace], [found_libunwind=yes],
                [AC_MSG_NOTICE([libunwind-ptrace not found])])
 AC_CHECK_HEADERS([libunwind.h], [found_libunwind_hdr=yes; break;])
-AS_IF([test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes"],
-      [AC_MSG_NOTICE([Unable to find libunwind. Building internal libunwind...])
+AS_IF([test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes" -o "x$enable_internal_libunwind" == "xyes"],
+      [AC_MSG_NOTICE([Building internal libunwind...])
        AC_CONFIG_SUBDIRS([libunwind])
        build_libunwind=yes],
       [build_libunwind=no])
@@ -83,6 +90,31 @@ AX_PROG_LUA([5.0],[],[
         ],[AC_MSG_ERROR([cannot find lua libs])])
     ],[AC_MSG_ERROR([cannot find lua headers])])
 ],[AC_MSG_ERROR([cannot find lua >= 5.0])])
+
+AC_ARG_ENABLE([pedantic],
+  [AS_HELP_STRING([--enable-pedantic], [Enable -pedantic @<:@default=yes@:>@])],
+  [], [enable_pedantic=yes])
+AS_IF([test "x$enable_pedantic" != xno],
+  [AC_SUBST([OHM_PEDANTIC], [-pedantic])])
+
+AC_ARG_ENABLE([wall],
+  [AS_HELP_STRING([--enable-wall], [Enable -Wall @<:@default=yes@:>@])],
+  [], [enable_wall=yes])
+AS_IF([test "x$enable_wall" != xno],
+  [AC_SUBST([OHM_W_ALL], [-Wall])])
+
+AC_ARG_ENABLE([werror],
+  [AS_HELP_STRING([--enable-werror], [Enable -Werror @<:@default=yes@:>@])],
+  [], [enable_werror=yes])
+AS_IF([test "x$enable_werror" != xno],
+  [AC_SUBST([OHM_W_ERROR], [-Werror])])
+
+AC_ARG_ENABLE([debug],
+  [AS_HELP_STRING([--enable-debug], [Enable debug code @<:@default=no@:>@])],
+  [], [enable_debug=no])
+AS_IF([test "x$enable_debug" != xno],
+  [AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging stuff])])
+AM_CONDITIONAL(DEBUG_BUILD, test x"$enable_debug" = xyes)
 
 AC_CONFIG_FILES([Makefile
                  benchmarks/Makefile

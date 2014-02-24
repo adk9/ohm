@@ -58,8 +58,9 @@ Makefile.in
 src/.deps
 src/Makefile
 src/Makefile.in
-src/doctor
+src/ohm-doctor
 benchmarks/Makefile
 benchmarks/Makefile.in
 benchmarks/.deps
 benchmarks/whetdc
+benchmarks/counting
