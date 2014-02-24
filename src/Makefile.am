@@ -13,11 +13,11 @@ else
 endif
 
 if BUILD_LIBDWARF
-  AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/
-  AM_LDFLAGS  += -L$(top_srcdir)/libdwarf/ -ldwarf
+  AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/libdwarf/
+  AM_LDFLAGS  += -L$(top_srcdir)/libdwarf/libdwarf/ -ldwarf
 endif
 
 if BUILD_LIBUNWIND
-  AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/ -I$(top_srcdir)/libunwind/include
+  AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/libdwarf/ -I$(top_srcdir)/libunwind/include
   AM_LDFLAGS  += -L$(top_srcdir)/libunwind/src/ -lunwind -lunwind-ptrace -lunwind-x86_64
 endif

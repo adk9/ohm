@@ -56,6 +56,7 @@ libtool
 Makefile
 Makefile.in
 src/.deps
+src/.libs
 src/Makefile
 src/Makefile.in
 src/ohm-doctor

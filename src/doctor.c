@@ -240,7 +240,7 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
     if ((tag != DW_TAG_variable) && (tag != DW_TAG_base_type) &&
         (tag != DW_TAG_array_type) && (tag != DW_TAG_subprogram) &&
         (tag != DW_TAG_structure_type))
-        goto error;
+        return -1;
 
     if (dwarf_attrlist(child_die, &attrs, &attrcount, &err) != DW_DLV_OK) {
         derror("error in dwarf_attrlist().");
@@ -282,9 +282,8 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                             goto error;
                         }
 
-                        if (attrcode == DW_AT_upper_bound) {
+                        if (attrcode == DW_AT_upper_bound)
                             get_number(cattrs[c], &bsz);
-                        }
                     }
 
                     types_table[types_table_size].id = offset;
@@ -357,7 +356,7 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
 
                 if (attrcode == DW_AT_location) {
                     if (dwarf_whatform(attrs[i], &form, &err) != DW_DLV_OK) {
-                        derror("Error in dwarf_whatform\n");
+                        derror("error in dwarf_whatform\n");
                         goto error;
                     }
 
@@ -400,9 +399,9 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                 }
 
                 if (attrcode == DW_AT_low_pc)
-                    dwarf_formaddr(attrs[i], &lowpc, 0);
+                    dwarf_formaddr(attrs[i], &lowpc, &err);
                 if (attrcode == DW_AT_high_pc) {
-                    dwarf_formaddr(attrs[i], &highpc, 0);
+                    dwarf_formaddr(attrs[i], &highpc, &err);
                     /* We construct a table of functions here
                      * so that we can index it later to find the stack
                      * probes to activate. */
@@ -418,6 +417,7 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
     return ((tag == DW_TAG_variable) && local_variable);
 
 error:
+    derror("error in add_var_from_die(). Dying.");
     return -1;
 }
 

@@ -14,7 +14,7 @@ is_location_form(int form)
     if (form == DW_FORM_block1 || form == DW_FORM_block2 ||
         form == DW_FORM_block4 || form == DW_FORM_block ||
         form == DW_FORM_data4 || form == DW_FORM_data8 ||
-        form == DW_FORM_sec_offset) {
+        form == DW_FORM_sec_offset || form == DW_FORM_exprloc) {
         return 1;
     }
     return 0;
