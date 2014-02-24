@@ -53,15 +53,20 @@ struct probe_t
     probe_t     *next;
 };
 
+#define OHM_COLOR_ERROR "\x1b[31m"
+#define OHM_COLOR_DEBUG "\x1b[32m"
+#define OHM_COLOR_RESET "\x1b[0m"
 
-#define derror(format, args...) do {                            \
-        fprintf(stderr, "[ERROR] %s:%d: " format "\n",          \
+#define derror(format, args...) do {                               \
+    fprintf(stderr, OHM_COLOR_ERROR "[ERROR] " OHM_COLOR_RESET     \
+            "%s:%d: " format "\n",                                 \
+            __func__, __LINE__, ##args); } while (0)
+
+#define ddebug(format, args...) do {                               \
+    if (doctor_debug)                                              \
+        fprintf(stderr, OHM_COLOR_DEBUG "[DEBUG] " OHM_COLOR_RESET \
+                "%s:%d: " format "\n",                             \
                 __func__, __LINE__, ##args); } while (0)
-
-#define ddebug(format, args...) do {                            \
-        if (doctor_debug)                                       \
-            fprintf(stderr, "[DEBUG] %s:%d: " format "\n",      \
-                    __func__, __LINE__, ##args); } while (0)
 
 
 #endif /* _DOCTOR_H */

@@ -96,6 +96,16 @@ get_variable(char *name)
     return NULL;
 }
 
+static inline void
+print_all_variables(void)
+{
+    int i;
+    for (i = 0; i < vars_table_size; i++)
+        ddebug("%d> %s (%s) at (%p,%ld)", i, vars_table[i].name,
+               vars_table[i].global ? "STACK":"GLOBAL",
+               (void*)vars_table[i].addr, vars_table[i].frame_offset);
+}
+
 static void
 lua_pushohmvalue(lua_State *L, basetypes_t *type, unw_word_t val)
 {
@@ -133,6 +143,8 @@ print_probes(probe_t *table)
 static inline int
 in_function(functions_t *f, unsigned long ip)
 {
+    //ddebug("fname: %s, f->lowpc = %p, f->hipc = %p, f->ip = %p",
+    //       f->name, (void*)f->lowpc, (void*)f->hipc, (void*)ip);
     return (f && ((ip >= f->lowpc) && (ip < f->hipc)));
 }
 
@@ -140,7 +152,7 @@ in_function(functions_t *f, unsigned long ip)
 static inline int
 in_main(unsigned long ip)
 {
-    // cache the main fn for better performance
+    // cache the main fn
     if (!main_fn)
         main_fn = get_function("main");
 
@@ -173,7 +185,7 @@ probes_table_add(probe_t **table, probe_t *probe)
 
 static void
 add_var_location(variables_t *var, Dwarf_Debug dbg, Dwarf_Die die,
-                 Dwarf_Attribute attr)
+                 Dwarf_Attribute attr, Dwarf_Half form)
 {
     Dwarf_Locdesc *llbuf = 0, **llbufarray = 0;
     Dwarf_Signed nelem;
@@ -184,6 +196,11 @@ add_var_location(variables_t *var, Dwarf_Debug dbg, Dwarf_Die die,
 
     if (!var)
         return;
+
+    if (form == DW_FORM_exprloc) {
+        // TODO: How to deal with exprlocs!
+        return;
+    }
 
     ret = dwarf_loclist_n(attr, &llbufarray, &nelem, &err);
     if (ret == DW_DLV_ERROR) {
@@ -227,9 +244,11 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
     Dwarf_Attribute *attrs, *cattrs;
     Dwarf_Signed attrcount, c, i;
     Dwarf_Unsigned bsz = 0, tid = 0;
-    Dwarf_Addr lowpc, highpc;
+    Dwarf_Addr lowpc = 0, highpc = 0;
     Dwarf_Die grandchild;
     basetypes_t *type;
+    int saw_lopc = 0;
+    int saw_hipc = 0;
 
     ret = dwarf_tag(child_die, &tag, &err);
     if (ret != DW_DLV_OK) {
@@ -370,10 +389,10 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                         }
                     }
 
-                    if (is_location_form(form))
-                        add_var_location(var, dbg, child_die, attrs[i]);
+                    if (is_location_form(form) || form == DW_FORM_exprloc)
+                        add_var_location(var, dbg, child_die, attrs[i], form);
                     else {
-                        derror("form %d error!", form);
+                        derror("unknown dwarf form: %d", form);
                         goto error;
                     }
                     local_variable = 1;
@@ -398,17 +417,39 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                     goto error;
                 }
 
-                if (attrcode == DW_AT_low_pc)
+                if (dwarf_whatform(attrs[i], &form, &err) != DW_DLV_OK) {
+                    derror("error in dwarf_whatform().");
+                    goto error;
+                }
+
+                if (attrcode == DW_AT_low_pc) {
+                    saw_lopc = 1;
                     dwarf_formaddr(attrs[i], &lowpc, &err);
+                    if (saw_hipc)
+                        highpc += lowpc;
+                }
+
                 if (attrcode == DW_AT_high_pc) {
-                    dwarf_formaddr(attrs[i], &highpc, &err);
-                    /* We construct a table of functions here
-                     * so that we can index it later to find the stack
-                     * probes to activate. */
+                    // If Dwarf4
+                    if (form != DW_FORM_addr && form == DW_FORM_data8) {
+                        get_number(attrs[i], &bsz);
+                        highpc = bsz;
+                        if (saw_lopc)
+                            highpc += lowpc;
+                    } else
+                        dwarf_formaddr(attrs[i], &highpc, &err);
+
+                    saw_hipc = 1;
+                }
+
+                if (saw_lopc && saw_hipc) {
+                    /* We construct a table of functions here so that
+                     * we can index it later to find the stack probes
+                     * to activate. */
                     get_child_name(dbg, child_die, fns_table[fns_table_size].name, 128);
                     fns_table[fns_table_size].lowpc = lowpc;
                     fns_table[fns_table_size].hipc = highpc;
-                    fns_table_size++;
+                    fns_table_size++;                    
                 }
             }
             break;
@@ -551,9 +592,12 @@ ohmread(char *path, probe_t **probes)
     while (lua_next(L, -2) != 0) {
         // name is at index -2 and probe struct at index -1
         probe = (char *) lua_tostring(L, -2);
+        lua_pop(L, 1);
         v = get_variable(probe);
-        if (!v)
+        if (!v) {
+            ddebug("Skipping non-existent probe %s.", probe);
             continue;
+        }
 
         p = malloc(sizeof(*p));
         if (!p)
@@ -565,8 +609,6 @@ ohmread(char *path, probe_t **probes)
             continue;
         else
             np++;
-
-        lua_pop(L, 1);
     }
     lua_pop(L, 1);
     return np;
@@ -697,6 +739,7 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", ret);
+    // print_all_variables();
 
     ddebug("reading ohm prescription: %s.", ohmfile);
     if ((ret = ohmread(ohmfile, &probes_table)) < 0) {
@@ -705,8 +748,10 @@ int main(int argc, char *argv[])
     } else
         ddebug("%d probes requested.", ret);
 
-    for (c = 0; c < types_table_size; c++)
-        printf("%d :: %s[%d] %lu\n", c, types_table[c].name, types_table[c].nelem, types_table[c].size);
+    // print the types table
+    // for (c = 0; c < types_table_size; c++)
+    //     printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
+    //            types_table[c].nelem, types_table[c].size);
 
     print_probes(probes_table);
 

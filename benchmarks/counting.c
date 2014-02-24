@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     for (i = 0; i < limit; ++i) {
-        //printf("[%d of %d] Count = %d\n", rank, size, i);
+        printf("[%d of %d] Count = %d\n", rank, size, i);
         sleep(2);
         MPI_Barrier(MPI_COMM_WORLD);
     }
