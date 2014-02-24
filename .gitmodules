@@ -1,6 +1,6 @@
 [submodule "libdwarf"]
 	path = libdwarf
-        url = git://libdwarf.git.sourceforge.net/gitroot/libdwarf/libdwarf
+	url = git://libdwarf.git.sourceforge.net/gitroot/libdwarf/libdwarf
 [submodule "libunwind"]
 	path = libunwind
         url = git://git.sv.gnu.org/libunwind.git
