@@ -52,7 +52,7 @@ AS_IF([test "x$found_libelf_hdr" != "xyes"],
 
 AC_ARG_ENABLE([internal-libdwarf],
   [AS_HELP_STRING([--enable-internal-libdwarf], [Enable Internal libdwarf @<:@default=no@:>@])],
-  [], [enable_internal_libdwarf=yes])
+  [enable_internal_libdwarf=yes], [enable_internal_libdwarf=no])
 AC_SEARCH_LIBS([dwarf_tag], [dwarf], [found_libdwarf=yes],
                [AC_MSG_NOTICE([libdwarf not found])])
 AC_CHECK_HEADERS([dwarf.h libdwarf.h], [found_libdwarf_hdr=yes; break;])
@@ -66,7 +66,7 @@ AM_CONDITIONAL([BUILD_LIBDWARF], [test "x$build_libdwarf" == "xyes"])
 # libunwind
 AC_ARG_ENABLE([internal-libunwind],
   [AS_HELP_STRING([--enable-internal-libunwind], [Enable Internal libunwind @<:@default=no@:>@])],
-  [], [enable_internal_libunwind=yes])
+  [enable_internal_libunwind=yes], [enable_internal_libunwind=no])
 AC_SEARCH_LIBS([unw_backtrace], [unwind],
 	       [found_libunwind=yes
 	       LIBS="$LIBS -lunwind -lunwind-generic"],
