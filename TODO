@@ -4,5 +4,8 @@ TODO
 1. xpmem, cross-memory attach etc. (to avoid an extra copy)
 2. case studies: ornl MD, viz
 3. distributed monitoring (mrnet, cci, mpi)
-4. asynchronous monitoring: debug registers, lttng ust
+4. asynchronous monitoring: debug registers, lttng ust, DynInst API
 5. loclists for accurate on-stack variable addresses
+6. Terra support
+7. Drop redundant updates.  
+8. Generate callgraph from DWARF
