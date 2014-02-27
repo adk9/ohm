@@ -1,15 +1,16 @@
 TODO
 ----
 
-1. xpmem, cross-memory attach etc. (to avoid an extra copy)
-2. case studies: ornl MD, viz
-3. distributed monitoring (mrnet, cci, mpi)
-4. asynchronous monitoring: debug registers, lttng ust, DynInst API
-5. loclists for accurate on-stack variable addresses
-6. Terra support
-7. Drop redundant updates.  
-8. Generate callgraph from DWARF
+- [ ] xpmem
+- [X] cross-memory attach
+- [ ] case studies: ornl MD, viz
+- [ ] distributed monitoring (mrnet, cci, mpi)
+- [ ] asynchronous monitoring: debug registers, lttng ust, DynInst API
+- [ ] loclists for accurate on-stack variable addresses
+- [ ] Terra support
+- [ ] Drop redundant updates.  
+- [ ] Generate callgraph from DWARF
 
-------------
+----------
 
-- Submit a patch to libunwind to extract a pid_t from the UPT_info structure.
+- [ ] Submit a patch to libunwind to extract a pid_t from the UPT_info structure.
