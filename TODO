@@ -9,3 +9,7 @@ TODO
 6. Terra support
 7. Drop redundant updates.  
 8. Generate callgraph from DWARF
+
+------------
+
+- Submit a patch to libunwind to extract a pid_t from the UPT_info structure.

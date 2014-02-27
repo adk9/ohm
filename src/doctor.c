@@ -3,7 +3,12 @@
 // and distributed under the terms of the BSD license.
 // See the COPYING file for details.
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -26,6 +31,9 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <dwarf.h>
+#if HAVE_CMA && HAVE_SYS_UIO_H
+#include <sys/uio.h>
+#endif
 
 #include "doctor.h"
 #include "dwarf-util.h"
@@ -40,28 +48,28 @@
 
 
 // Basetype table
-static basetypes_t  types_table[DEFAULT_NUM_TYPES];
+static basetype_t  types_table[DEFAULT_NUM_TYPES];
 static unsigned int types_table_size;
 
 // Function table
-static functions_t  fns_table[DEFAULT_NUM_FUNCTIONS];
+static function_t  fns_table[DEFAULT_NUM_FUNCTIONS];
 static unsigned int fns_table_size;
 
 // Variable table
-static variables_t  vars_table[DEFAULT_NUM_VARS];
+static variable_t  vars_table[DEFAULT_NUM_VARS];
 static unsigned int vars_table_size;
 
-// Probes table
-static probe_t     *probes_table;
+// List of "active" probes
+static probe_t     *probes_list;
 
 static double       doctor_interval = DEFAULT_INTERVAL;
 static int          doctor_debug;
-static functions_t *main_fn;
+static function_t *main_fn;
 
 static lua_State *L;
 
 // fetch a basetype for an object given its id
-static basetypes_t*
+static basetype_t*
 get_type(int id)
 {
     int i;
@@ -73,7 +81,7 @@ get_type(int id)
 }
 
 // fetch the function object for a function given its name
-static functions_t*
+static function_t*
 get_function(char *name)
 {
     int i;
@@ -85,7 +93,7 @@ get_function(char *name)
 }
 
 // get a variable object for a variable given its name
-static variables_t*
+static variable_t*
 get_variable(char *name)
 {
     int i;
@@ -106,42 +114,24 @@ print_all_variables(void)
                (void*)vars_table[i].addr, vars_table[i].frame_offset);
 }
 
-static void
-lua_pushohmvalue(lua_State *L, basetypes_t *type, unw_word_t val)
+static inline void
+lua_pushohmvalue(lua_State *L, basetype_t *type, void *val)
 {
-    if (!strcmp(type->name, "double")) {
-        lua_pushnumber(L, *((double *) &val));
-    } else if (!strcmp(type->name, "int")) {
-        lua_pushnumber(L, *((int *) &val));
-    } else if (!strcmp(type->name, "char")) {
-        lua_pushlstring(L, (const char *) &val, type->nelem);
-    } else if (!strcmp(type->name, "long int")) {
-        lua_pushnumber(L, *((long int *) &val));
-    } else {
-        lua_pushnumber(L, val);
-    }
-}
-
-// print all the active probes
-static void
-print_probes(probe_t *table)
-{
-    while (table) {
-        if (table->var) {
-            if (table->var->global)
-                ddebug("%s(0x%lx)\t[GLOBAL]", table->var->name,
-                       table->var->addr);
-            else
-                ddebug("%s(%ld)\t[STACK]", table->var->name,
-                       table->var->frame_offset);
-        }
-        table = table->next;
-    }
+    if (!strcmp(type->name, "double"))
+        lua_pushnumber(L, *((double *) val));
+    else if (!strcmp(type->name, "int"))
+        lua_pushnumber(L, *((int *) val));
+    else if (!strcmp(type->name, "char"))
+        lua_pushlstring(L, (const char *) val, type->nelem);
+    else if (!strcmp(type->name, "long int"))
+        lua_pushnumber(L, *((long int *) val));
+    else
+        derror("error pushing value: invalid basetype");
 }
 
 // check if the given "ip" spans within the given function f
 static inline int
-in_function(functions_t *f, unsigned long ip)
+in_function(function_t *f, unsigned long ip)
 {
     //ddebug("fname: %s, f->lowpc = %p, f->hipc = %p, f->ip = %p",
     //       f->name, (void*)f->lowpc, (void*)f->hipc, (void*)ip);
@@ -159,9 +149,35 @@ in_main(unsigned long ip)
     return in_function(main_fn, ip);
 }
 
+// allocate a new probe
+static probe_t *
+new_probe(variable_t *var, bool active) {
+    probe_t *p;
+    if (!var)
+        return NULL;
+
+    p = malloc(sizeof(*p));
+    if (!p)
+        return NULL;
+
+    p->var = var;
+    // we allocate a temporary buffer for the probe data here
+    if (!var->type)
+        return NULL;
+
+    p->buf = calloc(var->type->size, var->type->nelem);
+    if (!p->buf) {
+        free(p);
+        return NULL;
+    }
+    p->status = active;
+    p->next = NULL;
+    return p;
+}
+
 // add a probe to the probes table
 static int
-probes_table_add(probe_t **table, probe_t *probe)
+probes_list_add(probe_t **table, probe_t *probe)
 {
     probe_t *p;
 
@@ -181,10 +197,27 @@ probes_table_add(probe_t **table, probe_t *probe)
     return 0;
 }
 
-//TODO: probes_table_remove
+//TODO: probes_list_remove
+
+// print all the active probes
+static void
+print_probes(probe_t *probe)
+{
+    while (probe) {
+        if (probe->var) {
+            if (probe->var->global)
+                ddebug("%s(0x%lx)\t[GLOBAL]", probe->var->name,
+                       probe->var->addr);
+            else
+                ddebug("%s(%ld)\t[STACK]", probe->var->name,
+                       probe->var->frame_offset);
+        }
+        probe = probe->next;
+    }
+}
 
 static void
-add_var_location(variables_t *var, Dwarf_Debug dbg, Dwarf_Die die,
+add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
                  Dwarf_Attribute attr, Dwarf_Half form)
 {
     Dwarf_Locdesc *llbuf = 0, **llbufarray = 0;
@@ -228,7 +261,7 @@ add_var_location(variables_t *var, Dwarf_Debug dbg, Dwarf_Die die,
 }
 
 static int
-add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
+add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                  Dwarf_Die child_die)
 {
     int ret = DW_DLV_ERROR, local_variable = 0;
@@ -241,7 +274,7 @@ add_var_from_die(variables_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
     Dwarf_Unsigned bsz = 0, tid = 0;
     Dwarf_Addr lowpc = 0, highpc = 0;
     Dwarf_Die grandchild;
-    basetypes_t *type;
+    basetype_t *type;
     int saw_lopc = 0;
     int saw_hipc = 0;
 
@@ -557,10 +590,10 @@ error:
 static int
 ohmread(char *path, probe_t **probes)
 {
-    int np;
-    char *probe;
-    variables_t *v;
-    probe_t *p;
+    int         np;
+    char       *probe;
+    variable_t *v;
+    probe_t    *p;
 
     np = 0;
     L = lua_open();
@@ -594,13 +627,8 @@ ohmread(char *path, probe_t **probes)
             continue;
         }
 
-        p = malloc(sizeof(*p));
-        if (!p)
-            goto error;
-
-        p->var = v;
-        p->next = NULL;
-        if (probes_table_add(&probes_table, p) < 0)
+        p = new_probe(v, 1);
+        if (p && probes_list_add(&probes_list, p) < 0)
             continue;
         else
             np++;
@@ -613,10 +641,11 @@ error:
 }
 
 static void
-usage(char *name)
+usage(void)
 {
-    fprintf(stderr, "usage: %s [-D] [-o ohmfile]"
-            " [-i interval] <program> <args>\n", name);
+    fprintf(stderr, "usage: " PACKAGE_STRING "[-D] [-o ohmfile]"
+                    "\t [-i interval] <program> <args>\n\n");
+    fprintf(stderr, "Report bugs to" PACKAGE_BUGREPORT);
     exit(1);
 }
 
@@ -625,8 +654,9 @@ probe(unw_addr_space_t uas, void *uinfo, unw_cursor_t cursor)
 {
     int ret, i;
     probe_t *p;
-    unw_word_t val, ip, bp;
+    unw_word_t ip, bp;
     unw_cursor_t cur;
+    pid_t pid;
 
     lua_getglobal(L, "ohm_add");
     if(!lua_isfunction(L, -1)) {
@@ -635,25 +665,45 @@ probe(unw_addr_space_t uas, void *uinfo, unw_cursor_t cursor)
     }
 
     lua_newtable(L);
-    for (p = probes_table; p != NULL; p = p->next) {
+    for (p = probes_list; p != NULL; p = p->next) {
         if (p->var->global) {
             lua_pushstring(L, p->var->name);
             if (p->var->type->nelem > 1)
                 lua_newtable(L);
-
+#if HAVE_CMA
+            struct iovec local[1], remote[1];
+            local[0].iov_base = p->buf;
+            local[0].iov_len = p->var->type->size * p->var->type->nelem;
+            remote[0].iov_base = p->var->addr;
+            remote[0].iov_len = local[0].iov_len;
+            // HACK ALERT!
+            pid = (pid_t*)uinfo;
+            ret = 0;
+            do {
+                ret += process_vm_readv(pid, local, 1, remote, 1, 0);
+            } while (ret > 0 && ret < remote[0].iov_len);
+            if (ret < 0) {
+                perror("process_vm_readv");
+                continue;
+            }
+#else
             for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
-                ret = _UPT_access_mem(uas, p->var->addr+(i<<3), &val, 0, uinfo);
-                if (ret == -1)
+                ret = _UPT_access_mem(uas, p->var->addr+(i<<3), (unw_word_t*)(p->buf+(i<<3)),
+                                      0, uinfo);
+                if (ret < 0) {
                     perror("_UPT_access_mem");
-                else {
-                    if (p->var->type->nelem > 1)
-                        lua_pushnumber(L, i+1);
-
-                    lua_pushohmvalue(L, p->var->type, val);
-
-                    if (p->var->type->nelem > 1)
-                        lua_rawset(L, -3);
+                    continue;
                 }
+            }
+#endif
+            for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
+                if (p->var->type->nelem > 1)
+                    lua_pushnumber(L, i+1);
+
+                lua_pushohmvalue(L, p->var->type, p->buf+(i<<3));
+
+                if (p->var->type->nelem > 1)
+                    lua_rawset(L, -3);
             }
 
             lua_rawset(L, -3);
@@ -669,12 +719,42 @@ probe(unw_addr_space_t uas, void *uinfo, unw_cursor_t cursor)
             unw_get_reg(&cur, UNW_X86_64_RBP, &bp);
             if (in_function(p->var->function, ip)) {
                 lua_pushstring(L, p->var->name);
-                ret = _UPT_access_mem(uas, (bp+16+(p->var->frame_offset)),
-                                      &val, 0, uinfo);
-                if (ret == -1)
-                    perror("_UPT_access_mem");
-                else
-                    lua_pushohmvalue(L, p->var->type, val);
+#if HAVE_CMA
+                struct iovec local[1], remote[1];
+                local[0].iov_base = p->buf;
+                local[0].iov_len = p->var->type->size * p->var->type->nelem;
+                remote[0].iov_base = bp+16+(p->var->frame_offset);
+                remote[0].iov_len = local[0].iov_len;
+                // HACK ALERT!
+                pid = (pid_t*)uinfo;
+                ret = 0;
+                do {
+                    ret += process_vm_readv(pid, local, 1, remote, 1, 0);
+                } while (ret > 0 && ret < remote[0].iov_len);
+                if (ret < 0) {
+                    perror("process_vm_readv");
+                    continue;
+                }                
+#else
+                for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
+                    ret = _UPT_access_mem(uas, (bp+16+(p->var->frame_offset)+(i<<3)),
+                                          (unw_word_t*)(p->buf+(i<<3)), 0, uinfo);
+                    if (ret < 0) {
+                        perror("_UPT_access_mem");
+                        continue;
+                    }
+                }
+#endif
+
+                for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
+                    if (p->var->type->nelem > 1)
+                        lua_pushnumber(L, i+1);
+
+                    lua_pushohmvalue(L, p->var->type, p->buf+(i<<3));
+
+                    if (p->var->type->nelem > 1)
+                        lua_rawset(L, -3);
+                }
 
                 lua_rawset(L, -3);
             }
@@ -710,17 +790,16 @@ int main(int argc, char *argv[])
             case 'i':
                 doctor_interval = strtod(optarg, &s);
                 if (*s != '\0')
-                    usage(argv[0]);
+                    usage();
                 break;
             case 'h':
             default:
-                usage(argv[0]);
+                usage();
         }
     }
 
-    if ((argc - optind) < 1) {
-        usage(argv[0]);
-    }
+    if ((argc - optind) < 1)
+        usage();
 
     if (!doctor_interval) {
         derror("invalid interval %f.", doctor_interval);
@@ -737,7 +816,7 @@ int main(int argc, char *argv[])
     // print_all_variables();
 
     ddebug("reading ohm prescription: %s.", ohmfile);
-    if ((ret = ohmread(ohmfile, &probes_table)) < 0) {
+    if ((ret = ohmread(ohmfile, &probes_list)) < 0) {
         derror("error reading ohm prescription %s.", ohmfile);
         goto error;
     } else
@@ -748,7 +827,7 @@ int main(int argc, char *argv[])
     //     printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
     //            types_table[c].nelem, types_table[c].size);
 
-    print_probes(probes_table);
+    print_probes(probes_list);
 
     switch(cpid = fork()) {
         case -1:

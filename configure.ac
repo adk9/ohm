@@ -6,6 +6,7 @@
 AC_PREREQ([2.65])
 AC_INIT([ohm], [1.0], [adkulkar@indiana.edu])
 AC_CONFIG_SRCDIR([src/doctor.c])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
 AC_USE_SYSTEM_EXTENSIONS
@@ -29,7 +30,7 @@ AC_CHECK_LIB([elf], [elf_begin])
 AC_CHECK_LIB([m], [pow])
 
 # Checks for header files.
-AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h stdlib.h stdbool.h string.h sys/time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE
@@ -49,7 +50,6 @@ AS_IF([test "x$found_libelf_hdr" != "xyes"],
       [AC_MSG_ERROR([Unable to find libelf.h])])
 
 # libdwarf
-
 AC_ARG_ENABLE([internal-libdwarf],
   [AS_HELP_STRING([--enable-internal-libdwarf], [Enable Internal libdwarf @<:@default=no@:>@])],
   [enable_internal_libdwarf=yes], [enable_internal_libdwarf=no])
@@ -73,7 +73,7 @@ AC_SEARCH_LIBS([unw_backtrace], [unwind],
                [AC_MSG_NOTICE([libunwind not found])])
 AC_SEARCH_LIBS([_UPT_access_fpreg], [unwind-ptrace], [found_libunwind=yes],
                [AC_MSG_NOTICE([libunwind-ptrace not found])])
-AC_CHECK_HEADERS([libunwind.h], [found_libunwind_hdr=yes; break;])
+AC_CHECK_HEADER([libunwind.h], [found_libunwind_hdr=yes; break;])
 AS_IF([test "x$found_libunwind" != "xyes" -o "x$found_libunwind_hdr" != "xyes" -o "x$enable_internal_libunwind" == "xyes"],
       [AC_MSG_NOTICE([Building internal libunwind...])
        AC_CONFIG_SUBDIRS([libunwind])
@@ -91,6 +91,10 @@ AX_PROG_LUA([5.0],[],[
     ],[AC_MSG_ERROR([cannot find lua headers])])
 ],[AC_MSG_ERROR([cannot find lua >= 5.0])])
 
+# detect cross-memory attach support
+AX_CHECK_CMA
+
+# More arguments for debug builds.
 AC_ARG_ENABLE([pedantic],
   [AS_HELP_STRING([--enable-pedantic], [Enable -pedantic @<:@default=yes@:>@])],
   [], [enable_pedantic=yes])

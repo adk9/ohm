@@ -47,6 +47,11 @@ libdwarf/autom4te.cache/
 libdwarf/config.h.in~
 src/.Tpo
 src/libdwarfutil.a
+autom4te.cache/
+src/config.h
+src/config.h.in
+src/config.h.in~
+src/stamp-h1
 
 config
 aclocal.m4

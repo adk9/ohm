@@ -7,6 +7,7 @@
 #define _DOCTOR_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #define DEFAULT_OHMFILE         "default.ohm"
 #define DEFAULT_INTERVAL        3.0
@@ -15,8 +16,8 @@
 #define DEFAULT_NUM_VARS        256
 
 
-typedef struct basetypes_t basetypes_t;
-struct basetypes_t
+typedef struct basetype_t basetype_t;
+struct basetype_t
 {
     int          id;
     char         name[64];
@@ -25,8 +26,8 @@ struct basetypes_t
 };
 
 
-typedef struct functions_t functions_t;
-struct functions_t
+typedef struct function_t function_t;
+struct function_t
 {
     char          name[128];
     unsigned long lowpc;
@@ -34,12 +35,12 @@ struct functions_t
 };
 
 
-typedef struct variables_t variables_t;
-struct variables_t
+typedef struct variable_t variable_t;
+struct variable_t
 {
     char          name[256];
-    basetypes_t  *type;
-    functions_t  *function;
+    basetype_t   *type;
+    function_t   *function;
     unsigned int  global;
     unsigned long addr;
     signed long   frame_offset;
@@ -49,8 +50,10 @@ struct variables_t
 typedef struct probe_t probe_t;
 struct probe_t
 {
-    variables_t *var;
-    probe_t     *next;
+    variable_t *var;
+    void       *buf;
+    bool        status;
+    probe_t    *next;
 };
 
 #define OHM_COLOR_ERROR "\x1b[31m"
