@@ -5,5 +5,5 @@ whetdc_SOURCES      = whetdc.c
 counting_SOURCES    = counting.c
 
 AM_CPPFLAGS         = -I$(top_srcdir)/include -D_POSIX_C_SOURCE=200809L
-AM_CFLAGS           = -g -std=c99
+AM_CFLAGS           = -gdwarf-3 -std=c99
 AM_LDFLAGS          = -static

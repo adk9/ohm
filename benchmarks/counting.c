@@ -13,7 +13,7 @@ static int limit = 120; /* default */
 
 int main(int argc, char* argv[])
 {
-    int rank, size, i;
+    int i;
 
     if (argc > 1) {
         limit = (i = atoi(argv[1])) > 0 ? i : limit;

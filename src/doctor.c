@@ -114,9 +114,9 @@ print_all_variables(void)
 {
     int i;
     for (i = 0; i < vars_table_size; i++)
-        ddebug("%d> %s (%s) at (%p,%ld)", i, vars_table[i].name,
-               vars_table[i].global ? "STACK":"GLOBAL",
-               (void*)vars_table[i].addr, vars_table[i].frame_offset);
+        ddebug("%d> %s (%s) at 0x%lx", i, vars_table[i].name,
+               vars_table[i].global ? "GLOBAL" : "STACK",
+	       vars_table[i].global ? vars_table[i].addr : vars_table[i].frame_offset);
 }
 
 static inline void
@@ -250,13 +250,16 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
             Dwarf_Small op = expr->lr_atom;
 
             opd1 = expr->lr_number;
-            var->addr = 0;
-            var->frame_offset = 0;
             if (op == DW_OP_addr) {
                 var->global = 1;
                 var->addr = (Dwarf_Addr) opd1;
-            } else if (op == DW_OP_fbreg)
+            } else if (op == DW_OP_fbreg) {
                 var->frame_offset = (Dwarf_Signed) opd1;
+	    } else {
+		derror("DWARF-4 is not fully supported.");
+		exit(-1);
+	    }
+
         }
 
         dwarf_dealloc(dbg, llbufarray[i]->ld_s, DW_DLA_LOC_BLOCK);
@@ -668,7 +671,7 @@ remote_read(probe_t *probe, addr_t addr, void *arg)
     remote[0].iov_base = (void*)addr;
     remote[0].iov_len = size;
     // HACK ALERT!
-    pid = (pid_t*)arg;
+    pid = *((pid_t*)arg);
     ret = 0;
     do {
 	ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
@@ -796,7 +799,7 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", ret);
-    // print_all_variables();
+    print_all_variables();
 
     ddebug("reading ohm prescription: %s.", ohmfile);
     if ((ret = ohmread(ohmfile, &probes_list)) < 0) {

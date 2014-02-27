@@ -42,8 +42,10 @@ struct variable_t
     basetype_t   *type;
     function_t   *function;
     unsigned int  global;
+  union {
     addr_t        addr;
     signed long   frame_offset;
+  };
 };
 
 

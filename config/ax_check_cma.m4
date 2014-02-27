@@ -6,7 +6,7 @@ AC_DEFUN([AX_CHECK_CMA],[
       [Enable Cross Memory Attach support @<:@default=no@:>@])],
       [enable_cma=yes], [enable_cma=no])
 
-    AC_MSG_CHECKING([if user requested CMA build])
+    AC_MSG_CHECKING([if user requested CMA support])
     if test "$enable_cma" = "yes" ; then
        	    AC_MSG_RESULT([yes])
 	    AC_CHECK_HEADER([sys/uio.h])
