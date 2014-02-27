@@ -15,6 +15,7 @@
 #define DEFAULT_NUM_FUNCTIONS   256
 #define DEFAULT_NUM_VARS        256
 
+typedef unsigned long addr_t;
 
 typedef struct basetype_t basetype_t;
 struct basetype_t
@@ -29,11 +30,10 @@ struct basetype_t
 typedef struct function_t function_t;
 struct function_t
 {
-    char          name[128];
-    unsigned long lowpc;
-    unsigned long hipc;
+    char	name[128];
+    addr_t	lowpc;
+    addr_t	hipc;
 };
-
 
 typedef struct variable_t variable_t;
 struct variable_t
@@ -42,7 +42,7 @@ struct variable_t
     basetype_t   *type;
     function_t   *function;
     unsigned int  global;
-    unsigned long addr;
+    addr_t        addr;
     signed long   frame_offset;
 };
 

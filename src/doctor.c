@@ -48,15 +48,15 @@
 
 
 // Basetype table
-static basetype_t  types_table[DEFAULT_NUM_TYPES];
+static basetype_t   types_table[DEFAULT_NUM_TYPES];
 static unsigned int types_table_size;
 
 // Function table
-static function_t  fns_table[DEFAULT_NUM_FUNCTIONS];
+static function_t   fns_table[DEFAULT_NUM_FUNCTIONS];
 static unsigned int fns_table_size;
 
 // Variable table
-static variable_t  vars_table[DEFAULT_NUM_VARS];
+static variable_t   vars_table[DEFAULT_NUM_VARS];
 static unsigned int vars_table_size;
 
 // List of "active" probes
@@ -64,9 +64,14 @@ static probe_t     *probes_list;
 
 static double       doctor_interval = DEFAULT_INTERVAL;
 static int          doctor_debug;
-static function_t *main_fn;
+static function_t  *main_fn;
 
+// Global Lua state
 static lua_State *L;
+
+// Global unwind state
+static unw_addr_space_t unw_addrspace;
+static unw_cursor_t     unw_cursor;
 
 // fetch a basetype for an object given its id
 static basetype_t*
@@ -596,7 +601,7 @@ ohmread(char *path, probe_t **probes)
     probe_t    *p;
 
     np = 0;
-    L = lua_open();
+    L = luaL_newstate();
 
     luaL_openlibs(L);
     if (luaL_loadfile(L, "ohm.lua") || lua_pcall(L, 0, 0, 0)) {
@@ -649,14 +654,72 @@ usage(void)
     exit(1);
 }
 
-static void
-probe(unw_addr_space_t uas, void *uinfo, unw_cursor_t cursor)
+static int
+remote_read(probe_t *probe, addr_t addr, void *arg)
 {
     int ret, i;
+    pid_t pid;
+    size_t size = probe->var->type->size * probe->var->type->nelem;
+
+#if HAVE_CMA
+    struct iovec local[1], remote[1];
+    local[0].iov_base = probe->buf;
+    local[0].iov_len = size;
+    remote[0].iov_base = (void*)addr;
+    remote[0].iov_len = size;
+    // HACK ALERT!
+    pid = (pid_t*)arg;
+    ret = 0;
+    do {
+	ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
+        ret += process_vm_readv(pid, local, 1, remote, 1, 0);
+    } while (ret > 0 && ret < size);
+#else
+    for (i = 0; (i<<3) < size; i++) {
+	ddebug("mem read from 0x%lx to %p, size (%lu)", addr+(i<<3), probe->buf+(i<<3), size);
+        ret = _UPT_access_mem(unw_addrspace, addr+(i<<3),
+			      (unw_word_t*)(probe->buf+(i<<3)), 0, arg);
+    }
+#endif
+    return ret;
+}
+
+static int
+write_lua(probe_t *probe, addr_t addr, void *arg)
+{
+    int ret, i;
+
+    if (!probe)
+        return;
+
+    lua_pushstring(L, probe->var->name);
+    if (probe->var->type->nelem > 1)
+        lua_newtable(L);
+
+    ret = remote_read(probe, addr, arg);
+    if (ret < 0)
+	return ret;
+
+    for (i = 0; (i<<3) < (probe->var->type->size * probe->var->type->nelem); i++) {
+        if (probe->var->type->nelem > 1)
+            lua_pushnumber(L, i+1);
+
+        lua_pushohmvalue(L, probe->var->type, probe->buf+(i<<3));
+
+        if (probe->var->type->nelem > 1)
+            lua_rawset(L, -3);
+    }
+
+    lua_rawset(L, -3);
+    return ret;
+}
+
+static void
+probe(void *arg)
+{
     probe_t *p;
     unw_word_t ip, bp;
     unw_cursor_t cur;
-    pid_t pid;
 
     lua_getglobal(L, "ohm_add");
     if(!lua_isfunction(L, -1)) {
@@ -667,98 +730,21 @@ probe(unw_addr_space_t uas, void *uinfo, unw_cursor_t cursor)
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
         if (p->var->global) {
-            lua_pushstring(L, p->var->name);
-            if (p->var->type->nelem > 1)
-                lua_newtable(L);
-#if HAVE_CMA
-            struct iovec local[1], remote[1];
-            local[0].iov_base = p->buf;
-            local[0].iov_len = p->var->type->size * p->var->type->nelem;
-            remote[0].iov_base = p->var->addr;
-            remote[0].iov_len = local[0].iov_len;
-            // HACK ALERT!
-            pid = (pid_t*)uinfo;
-            ret = 0;
+            if (write_lua(p, p->var->addr, arg) < 0) 
+		derror("error in probe, skipping...");
+        } else {
+            // copy the cursor so we can move back
+            cur = unw_cursor;
             do {
-                ret += process_vm_readv(pid, local, 1, remote, 1, 0);
-            } while (ret > 0 && ret < remote[0].iov_len);
-            if (ret < 0) {
-                perror("process_vm_readv");
-                continue;
-            }
-#else
-            for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
-                ret = _UPT_access_mem(uas, p->var->addr+(i<<3), (unw_word_t*)(p->buf+(i<<3)),
-                                      0, uinfo);
-                if (ret < 0) {
-                    perror("_UPT_access_mem");
-                    continue;
-                }
-            }
-#endif
-            for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
-                if (p->var->type->nelem > 1)
-                    lua_pushnumber(L, i+1);
-
-                lua_pushohmvalue(L, p->var->type, p->buf+(i<<3));
-
-                if (p->var->type->nelem > 1)
-                    lua_rawset(L, -3);
-            }
-
-            lua_rawset(L, -3);
-            continue;
-        }
-
-        // copy the cursor so we can move back
-        cur = cursor;
-        do {
-            // unwind the stack to read as many
-            // probes as possible
-            unw_get_reg(&cur, UNW_REG_IP, &ip);
-            unw_get_reg(&cur, UNW_X86_64_RBP, &bp);
-            if (in_function(p->var->function, ip)) {
-                lua_pushstring(L, p->var->name);
-#if HAVE_CMA
-                struct iovec local[1], remote[1];
-                local[0].iov_base = p->buf;
-                local[0].iov_len = p->var->type->size * p->var->type->nelem;
-                remote[0].iov_base = bp+16+(p->var->frame_offset);
-                remote[0].iov_len = local[0].iov_len;
-                // HACK ALERT!
-                pid = (pid_t*)uinfo;
-                ret = 0;
-                do {
-                    ret += process_vm_readv(pid, local, 1, remote, 1, 0);
-                } while (ret > 0 && ret < remote[0].iov_len);
-                if (ret < 0) {
-                    perror("process_vm_readv");
-                    continue;
-                }                
-#else
-                for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
-                    ret = _UPT_access_mem(uas, (bp+16+(p->var->frame_offset)+(i<<3)),
-                                          (unw_word_t*)(p->buf+(i<<3)), 0, uinfo);
-                    if (ret < 0) {
-                        perror("_UPT_access_mem");
-                        continue;
-                    }
-                }
-#endif
-
-                for (i = 0; (i<<3) < (p->var->type->size * p->var->type->nelem); i++) {
-                    if (p->var->type->nelem > 1)
-                        lua_pushnumber(L, i+1);
-
-                    lua_pushohmvalue(L, p->var->type, p->buf+(i<<3));
-
-                    if (p->var->type->nelem > 1)
-                        lua_rawset(L, -3);
-                }
-
-                lua_rawset(L, -3);
-            }
-        } while (!in_main(ip) && (unw_step(&cur) > 0));
+                // unwind the stack to read as many
+                // probes as possible
+                unw_get_reg(&cur, UNW_REG_IP, &ip);
+                unw_get_reg(&cur, UNW_X86_64_RBP, &bp);
+                if (in_function(p->var->function, ip))
+		    if (write_lua(p, bp+16+(p->var->frame_offset), arg) < 0)
+			derror("error in probe, skipping...");
+	    } while (!in_main(ip) && (unw_step(&cur) > 0));
+	}
     }
 
     if (lua_pcall(L, 1, 0, 0) != 0) {
@@ -773,10 +759,7 @@ int main(int argc, char *argv[])
     char *s, *ohmfile;
     int c, ret, status;
     struct timespec ts;
-
-    unw_addr_space_t uaddrspace;
     void *upt_info;
-    unw_cursor_t cursor;
 
     ohmfile = DEFAULT_OHMFILE;
     while ((c = getopt(argc, argv, "Do:i:h")) != -1) {
@@ -854,8 +837,8 @@ int main(int argc, char *argv[])
 
             ddebug("Probing process %u.", cpid);
             // create the unwind address space
-            uaddrspace = unw_create_addr_space(&_UPT_accessors, 0);
-            if (!uaddrspace) {
+            unw_addrspace = unw_create_addr_space(&_UPT_accessors, 0);
+            if (!unw_addrspace) {
                 derror("unable to create unwind address space.");
                 goto error;
             }
@@ -871,14 +854,14 @@ int main(int argc, char *argv[])
             ts.tv_nsec = (doctor_interval - ts.tv_sec) * 1E9;
 
             while (!WIFEXITED(status) && !WIFSIGNALED(status)) {
-                ret = unw_init_remote(&cursor, uaddrspace, upt_info);
+                ret = unw_init_remote(&unw_cursor, unw_addrspace, upt_info);
                 if (ret < 0) {
                     derror("error initializing remote upt ptrace.");
                     goto error;
                 }
 
                 if (WIFSTOPPED(status))
-                    _UPT_resume(uaddrspace, &cursor, upt_info);
+                    _UPT_resume(unw_addrspace, &unw_cursor, upt_info);
 
                 nanosleep(&ts, NULL);
                 if (kill(cpid, SIGSTOP) < 0)
@@ -888,7 +871,7 @@ int main(int argc, char *argv[])
                 if (WIFEXITED(status))
                     break;
 
-                probe(uaddrspace, upt_info, cursor);
+                probe(upt_info);
             }
 
             _UPT_destroy(upt_info);
