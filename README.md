@@ -1,5 +1,14 @@
 # OHM
 
+
+#### Dependencies
+
+  * libelf
+  * libdwarf   (for debug information)
+  * libunwind  (for stack unwinding)
+  * lua
+  * CMA, XPMEM (optional; for optimized IPC)
+
 ---
 
 #### Notes
