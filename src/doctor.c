@@ -116,7 +116,7 @@ print_all_variables(void)
     for (i = 0; i < vars_table_size; i++)
         ddebug("%d> %s (%s) at 0x%lx", i, vars_table[i].name,
                vars_table[i].global ? "GLOBAL" : "STACK",
-	       vars_table[i].global ? vars_table[i].addr : vars_table[i].frame_offset);
+               vars_table[i].global ? vars_table[i].addr : vars_table[i].frame_offset);
 }
 
 static inline void
@@ -255,11 +255,10 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
                 var->addr = (Dwarf_Addr) opd1;
             } else if (op == DW_OP_fbreg) {
                 var->frame_offset = (Dwarf_Signed) opd1;
-	    } else {
-		derror("DWARF-4 is not fully supported.");
-		exit(-1);
-	    }
-
+            } else {
+                derror("DWARF-4 is not fully supported.");
+                exit(-1);
+            }
         }
 
         dwarf_dealloc(dbg, llbufarray[i]->ld_s, DW_DLA_LOC_BLOCK);
@@ -674,14 +673,14 @@ remote_read(probe_t *probe, addr_t addr, void *arg)
     pid = *((pid_t*)arg);
     ret = 0;
     do {
-	ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
+        //ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
         ret += process_vm_readv(pid, local, 1, remote, 1, 0);
     } while (ret > 0 && ret < size);
 #else
     for (i = 0; (i<<3) < size; i++) {
-	ddebug("mem read from 0x%lx to %p, size (%lu)", addr+(i<<3), probe->buf+(i<<3), size);
+        //ddebug("mem read from 0x%lx to %p, size (%lu)", addr+(i<<3), probe->buf+(i<<3), size);
         ret = _UPT_access_mem(unw_addrspace, addr+(i<<3),
-			      (unw_word_t*)(probe->buf+(i<<3)), 0, arg);
+                              (unw_word_t*)(probe->buf+(i<<3)), 0, arg);
     }
 #endif
     return ret;
@@ -701,7 +700,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
 
     ret = remote_read(probe, addr, arg);
     if (ret < 0)
-	return ret;
+        return ret;
 
     for (i = 0; (i<<3) < (probe->var->type->size * probe->var->type->nelem); i++) {
         if (probe->var->type->nelem > 1)
@@ -734,7 +733,7 @@ probe(void *arg)
     for (p = probes_list; p != NULL; p = p->next) {
         if (p->var->global) {
             if (write_lua(p, p->var->addr, arg) < 0) 
-		derror("error in probe, skipping...");
+                derror("error in probe, skipping...");
         } else {
             // copy the cursor so we can move back
             cur = unw_cursor;
@@ -744,10 +743,10 @@ probe(void *arg)
                 unw_get_reg(&cur, UNW_REG_IP, &ip);
                 unw_get_reg(&cur, UNW_X86_64_RBP, &bp);
                 if (in_function(p->var->function, ip))
-		    if (write_lua(p, bp+16+(p->var->frame_offset), arg) < 0)
-			derror("error in probe, skipping...");
-	    } while (!in_main(ip) && (unw_step(&cur) > 0));
-	}
+                    if (write_lua(p, bp+16+(p->var->frame_offset), arg) < 0)
+                        derror("error in probe, skipping...");
+            } while (!in_main(ip) && (unw_step(&cur) > 0));
+        }
     }
 
     if (lua_pcall(L, 1, 0, 0) != 0) {

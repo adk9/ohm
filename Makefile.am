@@ -10,4 +10,7 @@ endif
 if BUILD_LIBUNWIND
     SUBDIRS += libunwind
 endif
+if ENABLE_LUAJIT
+    SUBDIRS += luajit-2.0
+endif
 SUBDIRS     += src

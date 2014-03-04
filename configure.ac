@@ -94,6 +94,21 @@ AX_PROG_LUA([5.0],[],[
 # detect cross-memory attach support
 AX_CHECK_CMA
 
+# enable luajit
+AC_ARG_ENABLE([luajit],
+  [AS_HELP_STRING([--enable-luajit], [Enable LuaJIT support @<:@default=no@:>@])],
+  [enable_luajit=yes], [enable_luajit=no])
+AS_IF([test "x$enable_luajit" != xno],
+  [AC_SEARCH_LIBS([luaL_newstate], [luajit], [have_luajit=yes],
+                 [AC_MSG_NOTICE([libluajit not found])])
+   PKG_CHECK_MODULES([luajit], [luajit], [have_luajit=yes], [have_luajit=no])
+   AS_IF([test "x$have_luajit" != xno],
+     [LUA_INCLUDE="${luajit_CFLAGS}"
+     LUA_LIB="${luajit_LIBS}"
+     AC_SUBST(LUA_INCLUDE)
+     AC_SUBST(LUA_LIB)])])
+AM_CONDITIONAL([ENABLE_LUAJIT], [test "x$enable_luajit" == "xyes"])
+
 # More arguments for debug builds.
 AC_ARG_ENABLE([pedantic],
   [AS_HELP_STRING([--enable-pedantic], [Enable -pedantic @<:@default=yes@:>@])],
