@@ -6,8 +6,9 @@
   * libelf
   * libdwarf   (for debug information)
   * libunwind  (for stack unwinding)
-  * lua
+  * LUA 5.1+
   * CMA, XPMEM (optional; for optimized IPC)
+  * LuaJIT     (optional)
 
 ---
 
