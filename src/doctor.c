@@ -77,6 +77,7 @@ static unw_cursor_t     unw_cursor;
 static basetype_t*
 get_type(int id)
 {
+    printf("Looking for type with id %d\n", id);
     int i;
     for (i = 0; i < types_table_size; i++) {
         if (id == types_table[i].id)
@@ -115,8 +116,8 @@ print_all_variables(void)
     int i;
     for (i = 0; i < vars_table_size; i++)
         ddebug("%d> %s (%s) at 0x%lx", i, vars_table[i].name,
-               vars_table[i].global ? "GLOBAL" : "STACK",
-               vars_table[i].global ? vars_table[i].addr : vars_table[i].frame_offset);
+               is_addr(vars_table[i].loctype) ? "GLOBAL" : "STACK",
+               is_addr(vars_table[i].loctype) ? vars_table[i].addr : vars_table[i].offset);
 }
 
 static inline void
@@ -210,12 +211,12 @@ print_probes(probe_t *probe)
 {
     while (probe) {
         if (probe->var) {
-            if (probe->var->global)
+            if (is_addr(probe->var->loctype))
                 ddebug("%s(0x%lx)\t[GLOBAL]", probe->var->name,
                        probe->var->addr);
             else
                 ddebug("%s(%ld)\t[STACK]", probe->var->name,
-                       probe->var->frame_offset);
+                       probe->var->offset);
         }
         probe = probe->next;
     }
@@ -231,9 +232,17 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
     int i, ret = DW_DLV_ERROR, k;
     Dwarf_Half nops = 0;
     Dwarf_Unsigned opd1;
+    signed long stack[32];
+    int si;
 
     if (!var)
         return;
+
+    si = 0;
+    stack[si] = 0;
+    stack[++si] = 0;
+    var->loctype = 0;
+    var->addr = 0;
 
     ret = dwarf_loclist_n(attr, &llbufarray, &nelem, &err);
     if (ret == DW_DLV_ERROR) {
@@ -248,21 +257,144 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
         for (k = 0; k < nops; k++) {
             Dwarf_Loc *expr = &llbuf->ld_s[k];
             Dwarf_Small op = expr->lr_atom;
-
             opd1 = expr->lr_number;
-            if (op == DW_OP_addr) {
-                var->global = 1;
-                var->addr = (Dwarf_Addr) opd1;
-            } else if (op == DW_OP_fbreg) {
-                var->frame_offset = (Dwarf_Signed) opd1;
-            } else {
-                derror("DWARF-4 is not fully supported.");
-                exit(-1);
+
+            switch (op) {
+                case DW_OP_addr:
+                    var->loctype = OHM_ADDRESS;
+                    stack[++si] = opd1;
+                    break;
+                case DW_OP_fbreg:
+                    var->loctype = OHM_FBREG;
+                    stack[++si] = opd1;
+                    break;
+                case DW_OP_reg0:
+                case DW_OP_reg1:
+                case DW_OP_reg2:
+                case DW_OP_reg3:
+                case DW_OP_reg4:
+                case DW_OP_reg5:
+                case DW_OP_reg6:
+                case DW_OP_reg7:
+                case DW_OP_reg8:
+                case DW_OP_reg9:
+                case DW_OP_reg10:
+                case DW_OP_reg11:
+                case DW_OP_reg12:
+                case DW_OP_reg13:
+                case DW_OP_reg14:
+                case DW_OP_reg15:
+                case DW_OP_reg16:
+                case DW_OP_reg17:
+                case DW_OP_reg18:
+                case DW_OP_reg19:
+                case DW_OP_reg20:
+                case DW_OP_reg21:
+                case DW_OP_reg22:
+                case DW_OP_reg23:
+                case DW_OP_reg24:
+                case DW_OP_reg25:
+                case DW_OP_reg26:
+                case DW_OP_reg27:
+                case DW_OP_reg28:
+                case DW_OP_reg29:
+                case DW_OP_reg30:
+                case DW_OP_reg31:
+                    var->loctype = OHM_REG;
+                    stack[++si] = (opd1 - DW_OP_reg0);
+                    break;
+                case DW_OP_lit0:
+                case DW_OP_lit1:
+                case DW_OP_lit2:
+                case DW_OP_lit3:
+                case DW_OP_lit4:
+                case DW_OP_lit5:
+                case DW_OP_lit6:
+                case DW_OP_lit7:
+                case DW_OP_lit8:
+                case DW_OP_lit9:
+                case DW_OP_lit10:
+                case DW_OP_lit11:
+                case DW_OP_lit12:
+                case DW_OP_lit13:
+                case DW_OP_lit14:
+                case DW_OP_lit15:
+                case DW_OP_lit16:
+                case DW_OP_lit17:
+                case DW_OP_lit18:
+                case DW_OP_lit19:
+                case DW_OP_lit20:
+                case DW_OP_lit21:
+                case DW_OP_lit22:
+                case DW_OP_lit23:
+                case DW_OP_lit24:
+                case DW_OP_lit25:
+                case DW_OP_lit26:
+                case DW_OP_lit27:
+                case DW_OP_lit28:
+                case DW_OP_lit29:
+                case DW_OP_lit30:
+                case DW_OP_lit31:
+                    var->loctype = OHM_LITERAL;
+                    stack[++si] = (opd1 - DW_OP_lit0);
+                    break;
+                case DW_OP_stack_value:
+                    // the previos OP must have set the literal correctly,
+                    // so we simply continue.
+                    continue;
+                case DW_OP_deref:
+                    break;
+
+                case DW_OP_const1u:
+                case DW_OP_const2u:
+                case DW_OP_const4u:
+                case DW_OP_const8u:
+                case DW_OP_constu:
+                    stack[++si] = opd1;
+                    break;
+
+                case DW_OP_const1s:
+                case DW_OP_const2s:
+                case DW_OP_const4s:
+                case DW_OP_consts:
+                    stack[++si] = opd1;
+                    break;
+
+                case DW_OP_dup:
+                    stack[si+1] = stack[si];
+                    si++;
+                    break;
+                case DW_OP_plus:
+                    stack[si-1] += stack[si];
+                    si--;
+                    break;
+                case DW_OP_plus_uconst:
+                    stack[si] += opd1;
+                    break;
+                case DW_OP_minus:
+                    stack[si-1] -= stack[si];
+                    si--;
+                    break;
+                case DW_OP_GNU_push_tls_address:
+                    stack[si]++;
+                    break;
+                default:
+                    derror("DWARF-4 is not fully supported. Unsupported OP (0x%x).", op);
+                    exit(-1);
             }
         }
 
         dwarf_dealloc(dbg, llbufarray[i]->ld_s, DW_DLA_LOC_BLOCK);
         dwarf_dealloc(dbg, llbufarray[i], DW_DLA_LOCDESC);
+    }
+
+    if (is_addr(var->loctype) || is_reg(var->loctype) || is_literal(var->loctype))
+        var->addr = (Dwarf_Addr) stack[si];
+    else if (is_fbreg(var->loctype))
+        var->offset = (Dwarf_Signed) stack[si];
+    else {
+        derror("Unknown DWARF location type. OP (0x%x)", llbufarray[0]->ld_s[0].lr_atom);
+        exit(-1);
     }
     dwarf_dealloc(dbg, llbufarray, DW_DLA_LIST);
 }
@@ -342,10 +474,16 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
 
                     types_table[types_table_size].id = offset;
                     type = get_type(tid);
-                    strncpy(types_table[types_table_size].name, type->name, 64);
+                    printf("type %p\n", type);
+                    strcpy(types_table[types_table_size].name, type->name);
                     types_table[types_table_size].size = type->size;
                     types_table[types_table_size].nelem = bsz+1;
                     types_table_size++;
+                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
+                           types_table[types_table_size-1].id,
+                           types_table[types_table_size-1].name,
+                           types_table[types_table_size-1].nelem,
+                           types_table[types_table_size-1].size);
                 }
             }
             break;
@@ -369,6 +507,11 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                     types_table[types_table_size].size = bsz;
                     types_table[types_table_size].nelem = 1;
                     types_table_size++;
+                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
+                           types_table[types_table_size-1].id,
+                           types_table[types_table_size-1].name,
+                           types_table[types_table_size-1].nelem,
+                           types_table[types_table_size-1].size);
                 }
 
                 // get the tag members now, need a new type structure maybe?
@@ -398,6 +541,11 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                     types_table[types_table_size].size = bsz;
                     types_table[types_table_size].nelem = 1;
                     types_table_size++;
+                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
+                           types_table[types_table_size-1].id,
+                           types_table[types_table_size-1].name,
+                           types_table[types_table_size-1].nelem,
+                           types_table[types_table_size-1].size);
                 }
             }
             break;
@@ -442,6 +590,10 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                     // we should have constructed the
                     // types table by now.
                     var->type = get_type(offset);
+                    if (!var->type && local_variable != 1) {
+                        derror("Unknown variable type.");
+                        exit(-1);
+                    }
                 }
             }
             break;
@@ -484,9 +636,11 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                     get_child_name(dbg, child_die, fns_table[fns_table_size].name, 128);
                     fns_table[fns_table_size].lowpc = lowpc;
                     fns_table[fns_table_size].hipc = highpc;
-                    fns_table_size++;                    
+                    fns_table_size++;
                 }
             }
+            break;
+        default:
             break;
     }
 
@@ -720,7 +874,7 @@ static void
 probe(void *arg)
 {
     probe_t *p;
-    unw_word_t ip, bp;
+    unw_word_t ip, ptr;
     unw_cursor_t cur;
 
     lua_getglobal(L, "ohm_add");
@@ -731,21 +885,36 @@ probe(void *arg)
 
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
-        if (p->var->global) {
-            if (write_lua(p, p->var->addr, arg) < 0) 
-                derror("error in probe, skipping...");
-        } else {
-            // copy the cursor so we can move back
-            cur = unw_cursor;
-            do {
-                // unwind the stack to read as many
-                // probes as possible
-                unw_get_reg(&cur, UNW_REG_IP, &ip);
-                unw_get_reg(&cur, UNW_X86_64_RBP, &bp);
-                if (in_function(p->var->function, ip))
-                    if (write_lua(p, bp+16+(p->var->frame_offset), arg) < 0)
-                        derror("error in probe, skipping...");
-            } while (!in_main(ip) && (unw_step(&cur) > 0));
+        switch (p->var->loctype) {
+            case OHM_ADDRESS:
+                if (write_lua(p, p->var->addr, arg) < 0) 
+                    derror("error in probe, skipping...");
+                break;
+
+            default:
+                // copy the cursor so we can move back
+                cur = unw_cursor;
+                do {
+                    // unwind the stack to read as many
+                    // probes as possible
+                    unw_get_reg(&cur, UNW_REG_IP, &ip);
+                    if (in_function(p->var->function, ip)) {
+                        // Get the probe location
+                        if (is_fbreg(p->var->loctype)) {
+                            unw_get_reg(&cur, UNW_X86_64_RBP, &ptr);
+                            ptr = ptr+16+p->var->offset;
+                        } else if (is_reg(p->var->loctype)) {
+                            unw_get_reg(&cur, p->var->offset, &ptr);
+                        } else if (is_literal(p->var->loctype)) {
+                            ptr = p->var->offset;
+                        } else
+                            derror("don't know how to read probe, skipping...");
+                        // copy it to the Lua Land.
+                        if (write_lua(p, ptr, arg) < 0)
+                            derror("error in accessing probe, skipping...");
+                    }
+                } while (!in_main(ip) && (unw_step(&cur) > 0));
+                break;
         }
     }
 

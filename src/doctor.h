@@ -11,7 +11,7 @@
 
 #define DEFAULT_OHMFILE         "default.ohm"
 #define DEFAULT_INTERVAL        3.0
-#define DEFAULT_NUM_TYPES       64
+#define DEFAULT_NUM_TYPES       128
 #define DEFAULT_NUM_FUNCTIONS   256
 #define DEFAULT_NUM_VARS        256
 
@@ -35,19 +35,31 @@ struct function_t
     addr_t	hipc;
 };
 
+// The location type of a variable.
+#define OHM_ADDRESS  (1<<0)
+#define   OHM_FBREG  (1<<1)
+#define     OHM_REG  (1<<2)
+#define OHM_LITERAL  (1<<3)
+
 typedef struct variable_t variable_t;
 struct variable_t
 {
     char          name[256];
     basetype_t   *type;
     function_t   *function;
-    unsigned int  global;
+    unsigned int  loctype;
   union {
     addr_t        addr;
-    signed long   frame_offset;
+    signed long   offset;
   };
 };
 
+// Convenience macros to determine the location type
+// of the variable.
+#define  is_addr(v)   ((v) & (1<<0))
+#define is_fbreg(v)   ((v) & (1<<1))
+#define   is_reg(v)   ((v) & (1<<2))
+#define is_literal(v) ((v) & (1<<3))
 
 typedef struct probe_t probe_t;
 struct probe_t
