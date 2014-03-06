@@ -49,11 +49,11 @@ int
 get_child_name(Dwarf_Debug dbg, Dwarf_Die child, char *name, int size)
 {
     Dwarf_Error err;
+    char *cname;
 
     if (!name || !child)
         return -1;
 
-    char *cname;
     if (dwarf_diename(child, &cname, &err) != DW_DLV_OK)
         return -1;
 

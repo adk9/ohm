@@ -499,10 +499,11 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                     }
                     
                     var->type = get_type(offset);
-                    assert(var->type != NULL);
                 }
             }
-            vars_table_size++;
+            // skip variables whose types we cannot figure out.
+            if (var->type)
+                vars_table_size++;
             break;
         case DW_TAG_subprogram:
             for (i = 0; i < attrcount; ++i) {
@@ -610,30 +611,33 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                         goto error;
                     }
 
-                    ret = dwarf_child(die, &grandchild, &err);
-                    if (dwarf_attrlist(grandchild, &cattrs, &c, &err) != DW_DLV_OK) {
-                        derror("error in dwarf_attrlist()");
-                        goto error;
-                    }
+                    dwarf_child(die, &grandchild, &err);
+                    ret = dwarf_attrlist(grandchild, &cattrs, &c, &err);
+                    if (ret == DW_DLV_OK) {
+                        while (--c > 0) {
+                            if (dwarf_whatattr(cattrs[c], &attrcode, &err) != DW_DLV_OK) {
+                                derror("error in dwarf_whatattr()");
+                                goto error;
+                            }
 
-                    while (--c > 0) {
-                        if (dwarf_whatattr(cattrs[c], &attrcode, &err) != DW_DLV_OK) {
-                            derror("error in dwarf_whatattr()");
-                            goto error;
+                            if (attrcode == DW_AT_upper_bound)
+                                get_number(cattrs[c], &bsz);
                         }
+                    } else
+                        bsz = -1;
 
-                        if (attrcode == DW_AT_upper_bound)
-                            get_number(cattrs[c], &bsz);
-                    }
-
-                    type = get_type(tid);
-                    assert(type != NULL);
 
                     types_table[types_table_size].id = offset;
-                    strncpy(types_table[types_table_size].name, type->name, 128);
+                    type = get_type(tid);
+                    if (type) {
+                        strncpy(types_table[types_table_size].name, type->name, 128);
+                        types_table[types_table_size].istypedef = type->istypedef;
+                    } else {
+                        strncpy(types_table[types_table_size].name, "<unknown-array>", 128);
+                        types_table[types_table_size].istypedef = false;
+                    }
                     types_table[types_table_size].size = basetype_get_size(type);
                     types_table[types_table_size].nelem = bsz+1;
-                    types_table[types_table_size].istypedef = type->istypedef;
                     types_table_size++;
                 }
             }
@@ -654,7 +658,9 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                     }
 
                     types_table[types_table_size].id = offset;
-                    get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    ret = get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    if (ret < 0)
+                        strncpy(types_table[types_table_size].name, "<unknown-struct>", 128);
                     get_number(attrs[i], &bsz);
                     types_table[types_table_size].size = bsz;
                     types_table[types_table_size].nelem = 1;
@@ -688,7 +694,9 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                     }
 
                     types_table[types_table_size].id = offset;
-                    get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    ret = get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    if (ret < 0)
+                        strncpy(types_table[types_table_size].name, "<unknown-typedef>", 128);
                     types_table[types_table_size].size = 0;
                     // nelem indicates the base type ID here.
                     types_table[types_table_size].nelem = tid;
@@ -719,8 +727,8 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                         goto error;
                     }
 
-                    type = get_type(tid);
                     types_table[types_table_size].id = offset;
+                    type = get_type(tid);
                     if (type)
                         snprintf(types_table[types_table_size].name, 128, "%s*", type->name);
                     else
@@ -1122,6 +1130,7 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d base types found.", types_table_size);
+
     if ((ret = scan_file(argv[optind], &add_complextype_from_die)) < 0) {
         derror("error scanning types from %s. (compile with -g)",
                argv[optind]);
@@ -1131,8 +1140,9 @@ int main(int argc, char *argv[])
 
     // print the types table
     // for (c = 0; c < types_table_size; c++)
-    //     printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
-    //            types_table[c].nelem, types_table[c].size);
+    //     printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name,
+    //            types_table[c].nelem, types_table[c].size,
+    //            types_table[c].id);
 
     //  next we look for the variables.
     if ((ret = scan_file(argv[optind], &add_var_from_die)) < 0) {
