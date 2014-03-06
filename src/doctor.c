@@ -3,8 +3,8 @@
 // and distributed under the terms of the BSD license.
 // See the COPYING file for details.
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
+#if HAVE_CONFIG_H
+#include "config.h"
 #endif
 
 #include <stdio.h>
@@ -247,7 +247,7 @@ print_probes(probe_t *probe)
     }
 }
 
-static void
+static int
 add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
                  Dwarf_Attribute attr, Dwarf_Half form)
 {
@@ -261,7 +261,7 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
     int si;
 
     if (!var)
-        return;
+        return -1;
 
     si = 0;
     stack[si] = 0;
@@ -272,9 +272,9 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
     ret = dwarf_loclist_n(attr, &llbufarray, &nelem, &err);
     if (ret == DW_DLV_ERROR) {
         derror("error in dwarf_loclist_n().");
-        return;
+        return -1;
     } else if (ret == DW_DLV_NO_ENTRY)
-        return;
+        return 0;
 
     for (i = 0; i < nelem; ++i) {
         llbuf = llbufarray[i];
@@ -405,7 +405,7 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
                     break;
                 default:
                     derror("DWARF-4 is not fully supported. Unsupported OP (0x%x).", op);
-                    exit(-1);
+                    return -1;
             }
         }
 
@@ -419,9 +419,10 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
         var->offset = (Dwarf_Signed) stack[si];
     else {
         derror("Unknown DWARF location type. OP (0x%x)", llbufarray[0]->ld_s[0].lr_atom);
-        exit(-1);
+        return -1;
     }
     dwarf_dealloc(dbg, llbufarray, DW_DLA_LIST);
+    return 1;
 }
 
 
@@ -470,9 +471,11 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                         goto error;
                     }
 
-                    if (is_location_form(form) || form == DW_FORM_exprloc)
-                        add_var_location(var, dbg, child_die, attrs[i], form);
-                    else {
+                    if (is_location_form(form) || form == DW_FORM_exprloc) {
+                        // bail out if we cannot figure out the locdesc
+                        if ((ret = add_var_location(var, dbg, child_die, attrs[i], form)) < 0)
+                            goto error;
+                    } else {
                         derror("unknown dwarf form: %d", form);
                         goto error;
                     }
@@ -495,7 +498,6 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                         }
                     }
                     
-                    printf("Looking for type id 0x%x for name %s\n", offset, var->name);
                     var->type = get_type(offset);
                     assert(var->type != NULL);
                 }
@@ -506,12 +508,12 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
             for (i = 0; i < attrcount; ++i) {
                 if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
                     derror("error in dwarf_whatattr()");
-                    goto error;
+                    return -1;
                 }
 
                 if (dwarf_whatform(attrs[i], &form, &err) != DW_DLV_OK) {
                     derror("error in dwarf_whatform()");
-                    goto error;
+                    return -1;
                 }
 
                 if (attrcode == DW_AT_low_pc) {
@@ -552,7 +554,7 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
     return 1;
 
 error:
-    derror("error in add_var_from_die()");
+    derror("error adding variable %s", vars_table[vars_table_size].name);
     return -1;
 }
 
@@ -953,9 +955,9 @@ error:
 static void
 usage(void)
 {
-    fprintf(stderr, "usage: " PACKAGE_STRING "[-D] [-o ohmfile]"
+    fprintf(stderr, "usage: " PACKAGE_NAME " [-D] [-o ohmfile]\n"
                     "\t [-i interval] <program> <args>\n\n");
-    fprintf(stderr, "Report bugs to" PACKAGE_BUGREPORT);
+    fprintf(stderr, "Report bugs to " PACKAGE_BUGREPORT);
     exit(1);
 }
 
@@ -1128,9 +1130,9 @@ int main(int argc, char *argv[])
     ddebug("%d complex types found.", types_table_size);
 
     // print the types table
-    for (c = 0; c < types_table_size; c++)
-        printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
-               types_table[c].nelem, types_table[c].size);
+    // for (c = 0; c < types_table_size; c++)
+    //     printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
+    //            types_table[c].nelem, types_table[c].size);
 
     //  next we look for the variables.
     if ((ret = scan_file(argv[optind], &add_var_from_die)) < 0) {
@@ -1139,7 +1141,7 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", vars_table_size);
-    print_all_variables();
+    // print_all_variables();
 
     // And finally, we read the OHM prescription.
     ddebug("reading ohm prescription: %s.", ohmfile);
