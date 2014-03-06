@@ -73,11 +73,14 @@ static lua_State *L;
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
 
+
+// Callback function that represents the DWARF query operation.
+typedef int (*dwarf_query_cb_t)(Dwarf_Debug, Dwarf_Die, Dwarf_Die);
+
 // fetch a basetype for an object given its id
 static basetype_t*
 get_type(int id)
 {
-    printf("Looking for type with id %d\n", id);
     int i;
     for (i = 0; i < types_table_size; i++) {
         if (id == types_table[i].id)
@@ -108,6 +111,28 @@ get_variable(char *name)
             return &vars_table[i];
     }
     return NULL;
+}
+
+static inline size_t
+basetype_get_size(basetype_t *type)
+{
+    if (!type)
+        return 0;
+    if (type->istypedef)
+        return basetype_get_size(get_type(type->nelem));
+    else
+        return type->size;
+}
+
+static inline unsigned int
+basetype_get_nelem(basetype_t *type)
+{
+    if (!type)
+        return 0;
+    if (type->istypedef)
+        return basetype_get_nelem(get_type(type->nelem));
+    else
+        return type->nelem;
 }
 
 static inline void
@@ -171,7 +196,7 @@ new_probe(variable_t *var, bool active) {
     if (!var->type)
         return NULL;
 
-    p->buf = calloc(var->type->size, var->type->nelem);
+    p->buf = calloc(basetype_get_size(var->type), basetype_get_nelem(var->type));
     if (!p->buf) {
         free(p);
         return NULL;
@@ -399,11 +424,11 @@ add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
     dwarf_dealloc(dbg, llbufarray, DW_DLA_LIST);
 }
 
+
 static int
-add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
-                 Dwarf_Die child_die)
+add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
 {
-    int ret = DW_DLV_ERROR, local_variable = 0;
+    int ret = DW_DLV_ERROR;
     char pname[64], cname[64];
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
@@ -412,153 +437,51 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
     Dwarf_Signed attrcount, c, i;
     Dwarf_Unsigned bsz = 0, tid = 0;
     Dwarf_Addr lowpc = 0, highpc = 0;
-    Dwarf_Die grandchild;
-    basetype_t *type;
+    variable_t *var;
     int saw_lopc = 0;
     int saw_hipc = 0;
 
     ret = dwarf_tag(child_die, &tag, &err);
     if (ret != DW_DLV_OK) {
-        derror("error in dwarf_tag().");
+        derror("error in dwarf_tag()");
         goto error;
     }
 
-    if ((tag != DW_TAG_variable) && (tag != DW_TAG_base_type) &&
-        (tag != DW_TAG_array_type) && (tag != DW_TAG_subprogram) &&
-        (tag != DW_TAG_structure_type))
+    if ((tag != DW_TAG_variable) && (tag != DW_TAG_subprogram))
         return -1;
 
     if (dwarf_attrlist(child_die, &attrs, &attrcount, &err) != DW_DLV_OK) {
-        derror("error in dwarf_attrlist().");
+        derror("error in dwarf_attrlist()");
         goto error;
     }
 
     switch (tag) {
-        case DW_TAG_array_type:
-            for (i = 0; i < attrcount; ++i) {
-                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatattr().");
-                    goto error;
-                }
-
-                if (attrcode == DW_AT_type) {
-                    // get the offset
-                    ret = dwarf_die_CU_offset(child_die, &offset, &err);
-                    if (ret != DW_DLV_OK) {
-                        derror("error in dwarf_die_CU_offset().");
-                        goto error;
-                    }
-
-                    // get the type
-                    ret = dwarf_formref(attrs[i], &tid, &err);
-                    if (ret != DW_DLV_OK) {
-                        derror("error in dwarf_formref().");
-                        goto error;
-                    }
-
-                    ret = dwarf_child(child_die, &grandchild, &err);
-                    if (dwarf_attrlist(grandchild, &cattrs, &c, &err) != DW_DLV_OK) {
-                        derror("error in dwarf_attrlist().");
-                        goto error;
-                    }
-
-                    while (--c > 0) {
-                        if (dwarf_whatattr(cattrs[c], &attrcode, &err) != DW_DLV_OK) {
-                            derror("error in dwarf_whatattr().");
-                            goto error;
-                        }
-
-                        if (attrcode == DW_AT_upper_bound)
-                            get_number(cattrs[c], &bsz);
-                    }
-
-                    types_table[types_table_size].id = offset;
-                    type = get_type(tid);
-                    printf("type %p\n", type);
-                    strcpy(types_table[types_table_size].name, type->name);
-                    types_table[types_table_size].size = type->size;
-                    types_table[types_table_size].nelem = bsz+1;
-                    types_table_size++;
-                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
-                           types_table[types_table_size-1].id,
-                           types_table[types_table_size-1].name,
-                           types_table[types_table_size-1].nelem,
-                           types_table[types_table_size-1].size);
-                }
-            }
-            break;
-        case DW_TAG_structure_type:
-            for (i = 0; i < attrcount; ++i) {
-                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatattr().");
-                    goto error;
-                }
-
-                if (attrcode == DW_AT_byte_size) {
-                    ret = dwarf_die_CU_offset(child_die, &offset, &err);
-                    if (ret != DW_DLV_OK) {
-                        derror("error in dwarf_die_CU_offset().");
-                        goto error;
-                    }
-
-                    types_table[types_table_size].id = offset;
-                    get_child_name(dbg, child_die, types_table[types_table_size].name, 64);
-                    get_number(attrs[i], &bsz);
-                    types_table[types_table_size].size = bsz;
-                    types_table[types_table_size].nelem = 1;
-                    types_table_size++;
-                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
-                           types_table[types_table_size-1].id,
-                           types_table[types_table_size-1].name,
-                           types_table[types_table_size-1].nelem,
-                           types_table[types_table_size-1].size);
-                }
-
-                // get the tag members now, need a new type structure maybe?
-            }
-            break;
-
-        case DW_TAG_base_type:
-            for (i = 0; i < attrcount; ++i) {
-                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatattr().");
-                    goto error;
-                }
-
-                if (attrcode == DW_AT_byte_size) {
-                    ret = dwarf_die_CU_offset(child_die, &offset, &err);
-                    if (ret != DW_DLV_OK) {
-                        derror("error in dwarf_die_CU_offset().");
-                        goto error;
-                    }
-
-                    /* We construct a table of base types here
-                     * so that we can index it later to find the types
-                     * of some of the probes on the stack. */
-                    types_table[types_table_size].id = offset;
-                    get_child_name(dbg, child_die, types_table[types_table_size].name, 64);
-                    get_number(attrs[i], &bsz);
-                    types_table[types_table_size].size = bsz;
-                    types_table[types_table_size].nelem = 1;
-                    types_table_size++;
-                    printf("Added type %d :: ID %d %s[%d] %lu\n", types_table_size-1,
-                           types_table[types_table_size-1].id,
-                           types_table[types_table_size-1].name,
-                           types_table[types_table_size-1].nelem,
-                           types_table[types_table_size-1].size);
-                }
-            }
-            break;
         case DW_TAG_variable:
+            var = &vars_table[vars_table_size];
             for (i = 0; i < attrcount; ++i) {
                 if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatattr().");
+                    derror("error in dwarf_whatattr()");
                     goto error;
                 }
 
                 if (attrcode == DW_AT_location) {
                     if (dwarf_whatform(attrs[i], &form, &err) != DW_DLV_OK) {
-                        derror("error in dwarf_whatform\n");
+                        derror("error in dwarf_whatform()");
+                        goto error;
+                    }
+
+                    if (is_location_form(form) || form == DW_FORM_exprloc)
+                        add_var_location(var, dbg, child_die, attrs[i], form);
+                    else {
+                        derror("unknown dwarf form: %d", form);
+                        goto error;
+                    }
+                }
+
+                if (attrcode == DW_AT_type) {
+                    ret = dwarf_formref(attrs[i], &offset, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_formref()");
                         goto error;
                     }
 
@@ -571,41 +494,23 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
                             var->function = NULL;
                         }
                     }
-
-                    if (is_location_form(form) || form == DW_FORM_exprloc)
-                        add_var_location(var, dbg, child_die, attrs[i], form);
-                    else {
-                        derror("unknown dwarf form: %d", form);
-                        goto error;
-                    }
-                    local_variable = 1;
-                }
-
-                if (attrcode == DW_AT_type) {
-                    ret = dwarf_formref(attrs[i], &offset, &err);
-                    if (ret != DW_DLV_OK) {
-                        derror("error in dwarf_formref().");
-                        goto error;
-                    }
-                    // we should have constructed the
-                    // types table by now.
+                    
+                    printf("Looking for type id 0x%x for name %s\n", offset, var->name);
                     var->type = get_type(offset);
-                    if (!var->type && local_variable != 1) {
-                        derror("Unknown variable type.");
-                        exit(-1);
-                    }
+                    assert(var->type != NULL);
                 }
             }
+            vars_table_size++;
             break;
         case DW_TAG_subprogram:
             for (i = 0; i < attrcount; ++i) {
                 if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatattr().");
+                    derror("error in dwarf_whatattr()");
                     goto error;
                 }
 
                 if (dwarf_whatform(attrs[i], &form, &err) != DW_DLV_OK) {
-                    derror("error in dwarf_whatform().");
+                    derror("error in dwarf_whatform()");
                     goto error;
                 }
 
@@ -644,23 +549,269 @@ add_var_from_die(variable_t *var, Dwarf_Debug dbg, Dwarf_Die parent_die,
             break;
     }
 
-    return ((tag == DW_TAG_variable) && local_variable);
+    return 1;
 
 error:
-    derror("error in add_var_from_die(). Dying.");
+    derror("error in add_var_from_die()");
+    return -1;
+}
+
+
+static int
+add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
+{
+    int ret = DW_DLV_ERROR;
+    Dwarf_Error err = 0;
+    Dwarf_Off offset = 0;
+    Dwarf_Half tag = 0, attrcode, form;
+    Dwarf_Attribute *attrs, *cattrs;
+    Dwarf_Signed attrcount, c, i;
+    Dwarf_Unsigned bsz = 0, tid = 0;
+    Dwarf_Die grandchild;
+    basetype_t *type;
+
+    ret = dwarf_tag(die, &tag, &err);
+    if (ret != DW_DLV_OK) {
+        derror("error in dwarf_tag()");
+        goto error;
+    }
+
+    if ((tag != DW_TAG_array_type) && (tag != DW_TAG_structure_type) &&
+        (tag != DW_TAG_typedef) && (tag != DW_TAG_pointer_type))
+        return -1;
+
+    if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
+        derror("error in dwarf_attrlist()");
+        goto error;
+    }
+
+    switch (tag) {
+        case DW_TAG_array_type:
+            for (i = 0; i < attrcount; ++i) {
+                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+                    derror("error in dwarf_whatattr()");
+                    goto error;
+                }
+
+                if (attrcode == DW_AT_type) {
+                    // get the offset
+                    ret = dwarf_die_CU_offset(die, &offset, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_die_CU_offset()");
+                        goto error;
+                    }
+
+                    // get the type
+                    ret = dwarf_formref(attrs[i], &tid, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_formref()");
+                        goto error;
+                    }
+
+                    ret = dwarf_child(die, &grandchild, &err);
+                    if (dwarf_attrlist(grandchild, &cattrs, &c, &err) != DW_DLV_OK) {
+                        derror("error in dwarf_attrlist()");
+                        goto error;
+                    }
+
+                    while (--c > 0) {
+                        if (dwarf_whatattr(cattrs[c], &attrcode, &err) != DW_DLV_OK) {
+                            derror("error in dwarf_whatattr()");
+                            goto error;
+                        }
+
+                        if (attrcode == DW_AT_upper_bound)
+                            get_number(cattrs[c], &bsz);
+                    }
+
+                    type = get_type(tid);
+                    assert(type != NULL);
+
+                    types_table[types_table_size].id = offset;
+                    strncpy(types_table[types_table_size].name, type->name, 128);
+                    types_table[types_table_size].size = basetype_get_size(type);
+                    types_table[types_table_size].nelem = bsz+1;
+                    types_table[types_table_size].istypedef = type->istypedef;
+                    types_table_size++;
+                }
+            }
+            break;
+
+        case DW_TAG_structure_type:
+            for (i = 0; i < attrcount; ++i) {
+                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+                    derror("error in dwarf_whatattr()");
+                    goto error;
+                }
+
+                if (attrcode == DW_AT_byte_size) {
+                    ret = dwarf_die_CU_offset(die, &offset, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_die_CU_offset()");
+                        goto error;
+                    }
+
+                    types_table[types_table_size].id = offset;
+                    get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    get_number(attrs[i], &bsz);
+                    types_table[types_table_size].size = bsz;
+                    types_table[types_table_size].nelem = 1;
+                    types_table[types_table_size].istypedef = false;
+                    types_table_size++;
+                }
+
+                // get the tag members now, need a new type structure maybe?
+            }
+            break;
+
+        case DW_TAG_typedef:
+            for (i = 0; i < attrcount; ++i) {
+                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+                    derror("error in dwarf_whatattr()");
+                    goto error;
+                }
+
+                if (attrcode == DW_AT_type) {
+                    ret = dwarf_die_CU_offset(die, &offset, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_die_CU_offset()");
+                        goto error;
+                    }
+
+                    // get the type
+                    ret = dwarf_formref(attrs[i], &tid, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_formref()");
+                        goto error;
+                    }
+
+                    types_table[types_table_size].id = offset;
+                    get_child_name(dbg, die, types_table[types_table_size].name, 128);
+                    types_table[types_table_size].size = 0;
+                    // nelem indicates the base type ID here.
+                    types_table[types_table_size].nelem = tid;
+                    types_table[types_table_size].istypedef = true;
+                    types_table_size++;
+                }
+            }
+            break;
+
+        case DW_TAG_pointer_type:
+            for (i = 0; i < attrcount; ++i) {
+                if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+                    derror("error in dwarf_whatattr()");
+                    goto error;
+                }
+
+                if (attrcode == DW_AT_type) {
+                    ret = dwarf_die_CU_offset(die, &offset, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_die_CU_offset()");
+                        goto error;
+                    }
+
+                    // get the type
+                    ret = dwarf_formref(attrs[i], &tid, &err);
+                    if (ret != DW_DLV_OK) {
+                        derror("error in dwarf_formref()");
+                        goto error;
+                    }
+
+                    type = get_type(tid);
+                    types_table[types_table_size].id = offset;
+                    if (type)
+                        snprintf(types_table[types_table_size].name, 128, "%s*", type->name);
+                    else
+                        strncpy(types_table[types_table_size].name, "<unknown-ptr>", 128);
+                    types_table[types_table_size].size = 0;
+                    // nelem indicates the base type ID here.
+                    types_table[types_table_size].nelem = tid;
+                    types_table[types_table_size].istypedef = true;
+                    types_table_size++;
+                }
+            }
+            break;
+            
+        default:
+            break;
+    }
+
+    return 1;
+
+error:
+    derror("error in add_complextype_from_die()");
     return -1;
 }
 
 static int
-find_variables_in_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
+add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
+{
+    int ret = DW_DLV_ERROR;
+    Dwarf_Error err = 0;
+    Dwarf_Off offset = 0;
+    Dwarf_Half tag = 0, attrcode, form;
+    Dwarf_Attribute *attrs, *cattrs;
+    Dwarf_Signed attrcount, c, i;
+    Dwarf_Unsigned bsz = 0, tid = 0;
+    Dwarf_Die grandchild;
+    basetype_t *type;
+
+    ret = dwarf_tag(die, &tag, &err);
+    if (ret != DW_DLV_OK) {
+        derror("error in dwarf_tag()");
+        goto error;
+    }
+
+    if (tag != DW_TAG_base_type)
+        return -1;
+
+    if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
+        derror("error in dwarf_attrlist()");
+        goto error;
+    }
+
+    for (i = 0; i < attrcount; ++i) {
+        if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+            derror("error in dwarf_whatattr()");
+            goto error;
+        }
+
+        if (attrcode == DW_AT_byte_size) {
+            ret = dwarf_die_CU_offset(die, &offset, &err);
+            if (ret != DW_DLV_OK) {
+                derror("error in dwarf_die_CU_offset()");
+                goto error;
+            }
+
+            /* We construct a table of base types here so that we can
+             * index it later to find the types of some of the probes
+             * on the stack. */
+            types_table[types_table_size].id = offset;
+            get_child_name(dbg, die, types_table[types_table_size].name, 128);
+            get_number(attrs[i], &bsz);
+            types_table[types_table_size].size = bsz;
+            types_table[types_table_size].nelem = 1;
+            types_table[types_table_size].istypedef = false;
+            types_table_size++;
+        }
+    }
+
+    return 1;
+
+error:
+    derror("error in add_basetype_from_die()");
+    return -1;
+}
+
+static int
+traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
+             Dwarf_Die child_die)
 {
     int ret = DW_DLV_ERROR;
     Dwarf_Die cur_die = child_die, child;
     Dwarf_Error err;
 
-    if (add_var_from_die(&vars_table[vars_table_size], dbg,
-                         parent_die, child_die) > 0)
-        vars_table_size++;
+    (*cb)(dbg, parent_die, child_die);
 
     while (1) {
         Dwarf_Die sib_die = 0;
@@ -669,7 +820,7 @@ find_variables_in_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die
             derror("error in dwarf_child()");
             return -1;
         } else if (ret == DW_DLV_OK)
-            find_variables_in_die(dbg, cur_die, child);
+            traverse_die(cb, dbg, cur_die, child);
 
         ret = dwarf_siblingof(dbg, cur_die, &sib_die, &err);
         if (ret == DW_DLV_ERROR) {
@@ -682,21 +833,19 @@ find_variables_in_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die
             dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
 
         cur_die = sib_die;
-        if (add_var_from_die(&vars_table[vars_table_size], dbg,
-                             parent_die, cur_die) > 0)
-            vars_table_size++;
+        (*cb)(dbg, parent_die, cur_die);
     }
-    return vars_table_size;
+    return 1;
 }
 
-// scan for all variables in a given file "file". The debug
-// information defined by the DWARF format is used to fetch all the
-// symbols from within the file. We make a list of all the variables,
-// functions and types in the file.
+// scan for all types or variables and  function in a given file
+// "file". The debug information defined by the DWARF format is used
+// to fetch all of the symbols from within the file. We make a list of
+// the types or functions and variables in the file.
 static int
-scan_variables(char *file)
+scan_file(char *file, dwarf_query_cb_t cb)
 {
-    int ret = DW_DLV_ERROR, fd = -1, nvars;
+    int ret = DW_DLV_ERROR, fd = -1;
     Dwarf_Debug dbg = 0;
     Dwarf_Error err;
     Dwarf_Handler errhand = 0;
@@ -728,7 +877,7 @@ scan_variables(char *file)
         if (dwarf_siblingof(dbg, NULL, &cu_die, &err) == DW_DLV_ERROR)
             derror("error getting sibling of cu.");
 
-        nvars = find_variables_in_die(dbg, NULL, cu_die);
+        ret = traverse_die(cb, dbg, NULL, cu_die);
         dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
     }
 
@@ -738,7 +887,7 @@ scan_variables(char *file)
     }
 
     close(fd);
-    return nvars;
+    return 1;
 
 error:
     close(fd);
@@ -815,7 +964,7 @@ remote_read(probe_t *probe, addr_t addr, void *arg)
 {
     int ret, i;
     pid_t pid;
-    size_t size = probe->var->type->size * probe->var->type->nelem;
+    size_t size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
 
 #if HAVE_CMA
     struct iovec local[1], remote[1];
@@ -844,10 +993,13 @@ static int
 write_lua(probe_t *probe, addr_t addr, void *arg)
 {
     int ret, i;
+    size_t size;
 
     if (!probe)
         return;
 
+    size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
+    
     lua_pushstring(L, probe->var->name);
     if (probe->var->type->nelem > 1)
         lua_newtable(L);
@@ -856,7 +1008,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     if (ret < 0)
         return ret;
 
-    for (i = 0; (i<<3) < (probe->var->type->size * probe->var->type->nelem); i++) {
+    for (i = 0; (i<<3) < size; i++) {
         if (probe->var->type->nelem > 1)
             lua_pushnumber(L, i+1);
 
@@ -961,25 +1113,41 @@ int main(int argc, char *argv[])
     }
     ddebug("setting doctor interval to %.3f seconds.", doctor_interval);
 
-    if ((ret = scan_variables(argv[optind])) < 0) {
-        derror("error fetching variables from %s. (compile with -g)",
+    // First we scan for the functions and types.
+    if ((ret = scan_file(argv[optind], &add_basetype_from_die)) < 0) {
+        derror("error scanning types from %s. (compile with -g)",
                argv[optind]);
         goto error;
     }
-    ddebug("%d variables found.", ret);
+    ddebug("%d base types found.", types_table_size);
+    if ((ret = scan_file(argv[optind], &add_complextype_from_die)) < 0) {
+        derror("error scanning types from %s. (compile with -g)",
+               argv[optind]);
+        goto error;
+    }
+    ddebug("%d complex types found.", types_table_size);
+
+    // print the types table
+    for (c = 0; c < types_table_size; c++)
+        printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
+               types_table[c].nelem, types_table[c].size);
+
+    //  next we look for the variables.
+    if ((ret = scan_file(argv[optind], &add_var_from_die)) < 0) {
+        derror("error scanning variables from %s. (compile with -g)",
+               argv[optind]);
+        goto error;
+    }
+    ddebug("%d variables found.", vars_table_size);
     print_all_variables();
 
+    // And finally, we read the OHM prescription.
     ddebug("reading ohm prescription: %s.", ohmfile);
     if ((ret = ohmread(ohmfile, &probes_list)) < 0) {
         derror("error reading ohm prescription %s.", ohmfile);
         goto error;
     } else
         ddebug("%d probes requested.", ret);
-
-    // print the types table
-    // for (c = 0; c < types_table_size; c++)
-    //     printf("%d :: %s[%d] %lu\n", c, types_table[c].name,
-    //            types_table[c].nelem, types_table[c].size);
 
     print_probes(probes_list);
 

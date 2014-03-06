@@ -11,7 +11,7 @@
 
 #define DEFAULT_OHMFILE         "default.ohm"
 #define DEFAULT_INTERVAL        3.0
-#define DEFAULT_NUM_TYPES       128
+#define DEFAULT_NUM_TYPES       256
 #define DEFAULT_NUM_FUNCTIONS   256
 #define DEFAULT_NUM_VARS        256
 
@@ -20,10 +20,11 @@ typedef unsigned long addr_t;
 typedef struct basetype_t basetype_t;
 struct basetype_t
 {
-    int          id;
-    char         name[64];
+    unsigned int id;
+    char         name[128];
     size_t       size;
     unsigned int nelem;
+    bool         istypedef;
 };
 
 
