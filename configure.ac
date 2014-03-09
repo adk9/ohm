@@ -43,6 +43,37 @@ AC_FUNC_MALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([strerror])
 
+# Set architecture
+AC_DEFUN([SET_ARCH],[
+    AS_CASE([$1],
+        [arm*],[$2=arm],
+        [i?86],[$2=x86],
+        [hppa*],[$2=hppa],
+        [mips*],[$2=mips],
+        [powerpc*],[$2=ppc$ppc_bits],
+        [sh*],[$2=sh],
+        [amd64],[$2=x86_64],
+        [$2=$1])
+]) dnl SET_ARCH
+
+SET_ARCH([$build_cpu],[build_arch])
+SET_ARCH([$host_cpu],[host_arch])
+
+AC_MSG_CHECKING([for build architecture])
+AC_MSG_RESULT([$build_arch])
+AC_MSG_CHECKING([for host architecture])
+AC_MSG_RESULT([$host_arch])
+AC_MSG_CHECKING([for host operating system])
+AC_MSG_RESULT([$host_os])
+
+arch="$host_arch"
+AC_SUBST(arch)
+
+# Check for flag to force dwarf-3.
+DWARF_CFLAGS=""
+AX_CHECK_COMPILE_FLAG([-gdwarf-3], [DWARF_CFLAGS="-gdwarf-3"], [DWARF_CFLAGS="-g"], [])
+AC_SUBST([DWARF_CFLAGS])
+
 # libelf
 AC_SEARCH_LIBS([elf32_getehdr], [elf], [], [AC_MSG_ERROR([libelf not found])])
 AC_CHECK_HEADERS([elf.h libelf.h], [found_libelf_hdr=yes; break;])

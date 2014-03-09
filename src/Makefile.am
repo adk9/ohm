@@ -5,6 +5,7 @@ ohm_doctor_SOURCES = dwarf-util.c doctor.c
 AM_CPPFLAGS    = -D_POSIX_C_SOURCE=200809L -I/usr/include 
 AM_CFLAGS      = -std=c99 $(OHM_PEDANTIC) $(OHM_W_ALL) $(OHM_W_ERROR)
 AM_LDFLAGS     = -static
+ohm_doctor_LDADD =
 
 if DEBUG_BUILD
   ohm_doctor_CFLAGS = -g -O0
@@ -14,17 +15,19 @@ endif
 
 if BUILD_LIBDWARF
   AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/libdwarf
-  AM_LDFLAGS  += $(top_srcdir)/libdwarf/libdwarf/libdwarf.a
+  ohm_doctor_LDADD += $(top_srcdir)/libdwarf/libdwarf/libdwarf.a
 endif
 
 if BUILD_LIBUNWIND
   AM_CPPFLAGS += -I$(top_srcdir)/libdwarf/libdwarf -I$(top_srcdir)/libunwind/include
-  AM_LDFLAGS  += -L$(top_srcdir)/libunwind/src -lunwind -lunwind-ptrace -lunwind-x86_64
+  ohm_doctor_LDADD += $(top_srcdir)/libunwind/src/libunwind.la
+  ohm_doctor_LDADD += $(top_srcdir)/libunwind/src/libunwind-ptrace.la
+  ohm_doctor_LDADD += $(top_srcdir)/libunwind/src/libunwind-$(arch).la
 endif
 
 if ENABLE_LUAJIT
   AM_CPPFLAGS += -I$(top_srcdir)/luajit-2.0/src
-  AM_LDFLAGS  += $(top_srcdir)/luajit-2.0/src/libluajit.a
+  ohm_doctor_LDADD += $(top_srcdir)/luajit-2.0/src/libluajit.a
 else
   AM_CPPFLAGS += $(LUA_INCLUDE)
   AM_LDFLAGS  += $(LUA_LIB)
