@@ -125,6 +125,9 @@ AX_PROG_LUA([5.0],[],[
 # detect cross-memory attach support
 AX_CHECK_CMA
 
+# check if XPMEM is present
+AX_CHECK_XPMEM
+
 # enable luajit
 AC_ARG_ENABLE([luajit],
   [AS_HELP_STRING([--enable-luajit], [Enable LuaJIT support @<:@default=no@:>@])],
@@ -142,8 +145,8 @@ AM_CONDITIONAL([ENABLE_LUAJIT], [test "x$enable_luajit" == "xyes"])
 
 # More arguments for debug builds.
 AC_ARG_ENABLE([pedantic],
-  [AS_HELP_STRING([--enable-pedantic], [Enable -pedantic @<:@default=yes@:>@])],
-  [], [enable_pedantic=yes])
+  [AS_HELP_STRING([--enable-pedantic], [Enable -pedantic @<:@default=no@:>@])],
+  [enable_pedantic=yes], [enable_pedantic=no])
 AS_IF([test "x$enable_pedantic" != xno],
   [AC_SUBST([OHM_PEDANTIC], [-pedantic])])
 

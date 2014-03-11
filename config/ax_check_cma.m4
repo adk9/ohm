@@ -12,7 +12,10 @@ AC_DEFUN([AX_CHECK_CMA],[
 	    AC_CHECK_HEADER([sys/uio.h])
             AC_CHECK_FUNC(process_vm_readv,  [cma_readv=1], [cma_readv=0])
             AC_CHECK_FUNC(process_vm_writev, [cma_writev=1], [cma_writev=0])
-            AC_DEFINE_UNQUOTED([HAVE_CMA], [$cma_readv], [Needed CMA syscalls defined])
+            AS_IF([test "$cma_readv" != "1" -o "$cma_writev" != "1"],
+                  [AC_MSG_ERROR([CMA not supported by kernel.])],
+                  [AC_DEFINE_UNQUOTED([HAVE_CMA], [$cma_readv],
+                  [Needed CMA syscalls found])])
     else
        	    AC_MSG_RESULT([no])
     fi

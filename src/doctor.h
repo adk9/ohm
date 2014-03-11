@@ -86,5 +86,12 @@ struct probe_t
                 "%s:%d: " format "\n",                             \
                 __func__, __LINE__, ##args); } while (0)
 
+#define USED(x) if(x){}else{}
+#ifdef __GNUC__
+#       if __GNUC__ >= 3
+#               undef USED
+#               define USED(x) ((void)(x))
+#       endif
+#endif
 
 #endif /* _DOCTOR_H */

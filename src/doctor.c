@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
 #ifdef __linux__
@@ -33,6 +34,9 @@
 #include <dwarf.h>
 #if HAVE_CMA && HAVE_SYS_UIO_H
 #include <sys/uio.h>
+#endif
+#if HAVE_XPMEM
+#include <xpmem.h>
 #endif
 
 #include "doctor.h"
@@ -65,6 +69,8 @@ static probe_t     *probes_list;
 static double       doctor_interval = DEFAULT_INTERVAL;
 static int          doctor_debug;
 static function_t  *main_fn;
+static bool         ohm_shutdown;
+static pid_t        ohm_cpid;
 
 // Global Lua state
 static lua_State *L;
@@ -73,9 +79,26 @@ static lua_State *L;
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
 
+#if HAVE_XPMEM
+typedef struct ohm_seg_t ohm_seg_t;
+struct ohm_seg_t {
+    xpmem_segid_t seg;
+    xpmem_apid_t  ap;
+    void*         addr;   /* local virtual address */
+    void*         start;  /* remote virtual address */
+    unsigned long len;    /* length of the segment */
+    unsigned long perm;   /* permissions - octal value */
+};
+
+static int xpmem_nseg;    /* number of XPMEM segments */
+static ohm_seg_t xpmem_segs[128];
+#endif
 
 // Callback function that represents the DWARF query operation.
 typedef int (*dwarf_query_cb_t)(Dwarf_Debug, Dwarf_Die, Dwarf_Die);
+
+// Forward Declarations
+void ohm_cleanup(int sig);
 
 // fetch a basetype for an object given its id
 static basetype_t*
@@ -434,9 +457,9 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
     Dwarf_Half tag = 0, attrcode, form;
-    Dwarf_Attribute *attrs, *cattrs;
-    Dwarf_Signed attrcount, c, i;
-    Dwarf_Unsigned bsz = 0, tid = 0;
+    Dwarf_Attribute *attrs;
+    Dwarf_Signed attrcount, i;
+    Dwarf_Unsigned bsz = 0;
     Dwarf_Addr lowpc = 0, highpc = 0;
     variable_t *var;
     int saw_lopc = 0;
@@ -566,7 +589,7 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
     int ret = DW_DLV_ERROR;
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
-    Dwarf_Half tag = 0, attrcode, form;
+    Dwarf_Half tag = 0, attrcode;
     Dwarf_Attribute *attrs, *cattrs;
     Dwarf_Signed attrcount, c, i;
     Dwarf_Unsigned bsz = 0, tid = 0;
@@ -759,12 +782,10 @@ add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
     int ret = DW_DLV_ERROR;
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
-    Dwarf_Half tag = 0, attrcode, form;
-    Dwarf_Attribute *attrs, *cattrs;
-    Dwarf_Signed attrcount, c, i;
-    Dwarf_Unsigned bsz = 0, tid = 0;
-    Dwarf_Die grandchild;
-    basetype_t *type;
+    Dwarf_Half tag = 0, attrcode;
+    Dwarf_Attribute *attrs;
+    Dwarf_Signed attrcount, i;
+    Dwarf_Unsigned bsz = 0;
 
     ret = dwarf_tag(die, &tag, &err);
     if (ret != DW_DLV_OK) {
@@ -960,6 +981,98 @@ error:
     return -1;
 }
 
+#if HAVE_XPMEM
+static int
+xpmem_copy(void *dst, void *src, size_t size)
+{
+    int i;
+    unsigned long offset;
+
+     for (i = 0; i < xpmem_nseg; i++) { 
+         if ((src >= xpmem_segs[i].start) && 
+             (src <= xpmem_segs[i].start+xpmem_segs[i].len-size)) { 
+             offset = src-xpmem_segs[i].start; 
+             memcpy(dst, xpmem_segs[i].addr+offset, size); 
+             return size; 
+         } 
+     } 
+     return -1;
+}
+
+static int
+xpmem_attach_mem(pid_t pid)
+{
+    FILE *file;
+    char buf[2048], name[256];
+    unsigned long vm_start;
+    unsigned long vm_end;
+    char r, w, x, p;
+    int n;
+    struct xpmem_addr addr;
+    ohm_seg_t *seg;
+
+    sprintf(buf, "/proc/%d/maps", pid);
+    file = fopen(buf, "r");
+    if (!file) {
+        perror("fopen");
+        return -1;
+    }
+
+    xpmem_nseg = 0;
+    while (fgets(buf, sizeof(buf), file) != NULL) {
+        n = sscanf(buf, "%lx-%lx %c%c%c%c %*lx %*s %*ld %255s", &vm_start, &vm_end,
+                   &r, &w, &x, &p, name);
+        if (n < 2) {
+            derror("unexpected line: %s\n", buf);
+            continue;
+        }
+
+        if (strcmp(name, "[heap]") && strcmp(name, "[stack]"))
+            continue;
+
+        seg = &xpmem_segs[xpmem_nseg++];
+        seg->perm = ((r=='r')*0444)+((w=='w')*0222)+((x=='x')*0111);
+        seg->start = (void*)vm_start;
+        seg->len = vm_end-vm_start;
+        seg->seg = xpmem_make(seg->start, seg->len, XPMEM_PERMIT_MODE,
+                              (void*)seg->perm);
+        if (seg->seg == -1) {
+            perror("xpmem_make");
+            return -1;
+        }
+
+        seg->ap = xpmem_get(seg->seg, (seg->perm==0444) ? XPMEM_RDONLY : XPMEM_RDWR,
+                            XPMEM_PERMIT_MODE, (void*)seg->perm);
+        if (seg->ap == -1) {
+            perror("xpmem_get");
+            return -1;
+        }
+
+        addr.apid = seg->ap;
+        addr.offset = 0;
+        seg->addr = xpmem_attach(addr, seg->len, 0);
+        ddebug("Registered segment %p ==> %p, len %lu", seg->addr, seg->start, seg->len);
+        if (seg->addr == (void*)-1 || seg->addr == MAP_FAILED) {
+            perror("xpmem_attach");
+            return -1;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
+static void
+xpmem_detach_mem(void)
+{
+    int i;
+    for (i = 0; i < xpmem_nseg; i++) {
+        xpmem_detach(xpmem_segs[i].addr);
+        xpmem_release(xpmem_segs[i].ap);
+        xpmem_remove(xpmem_segs[i].seg);
+    }
+}
+#endif
+
 static void
 usage(void)
 {
@@ -972,29 +1085,31 @@ usage(void)
 static int
 remote_read(probe_t *probe, addr_t addr, void *arg)
 {
-    int ret, i;
-    pid_t pid;
+    int ret;
     size_t size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
+    ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
 
 #if HAVE_CMA
     struct iovec local[1], remote[1];
+    pid_t pid;
+
     local[0].iov_base = probe->buf;
     local[0].iov_len = size;
     remote[0].iov_base = (void*)addr;
     remote[0].iov_len = size;
-    // HACK ALERT!
-    pid = *((pid_t*)arg);
+    USED(arg);
     ret = 0;
     do {
-        //ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
-        ret += process_vm_readv(pid, local, 1, remote, 1, 0);
+        ret += process_vm_readv(ohm_cpid, local, 1, remote, 1, 0);
     } while (ret > 0 && ret < size);
+#elif HAVE_XPMEM
+    USED(arg);
+    ret = xpmem_copy(probe->buf, (void*)addr, size);
 #else
-    for (i = 0; (i<<3) < size; i++) {
-        //ddebug("mem read from 0x%lx to %p, size (%lu)", addr+(i<<3), probe->buf+(i<<3), size);
+    int i;
+    for (i = 0; (i<<3) < size; i++)
         ret = _UPT_access_mem(unw_addrspace, addr+(i<<3),
                               (unw_word_t*)(probe->buf+(i<<3)), 0, arg);
-    }
 #endif
     return ret;
 }
@@ -1006,7 +1121,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     size_t size;
 
     if (!probe)
-        return;
+        return 0;
 
     size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
     
@@ -1086,9 +1201,21 @@ probe(void *arg)
     }
 }
 
+void ohm_cleanup(int sig)
+{
+    ohm_shutdown = true;
+    // ask the probed process to terminate
+    if (kill(ohm_cpid, SIGTERM) < 0)
+        perror("kill");
+    waitpid(ohm_cpid, 0, WNOHANG);
+#if HAVE_XPMEM
+    xpmem_detach_mem();
+#endif
+    exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[])
 {
-    pid_t cpid;
     char *s, *ohmfile;
     int c, ret, status;
     struct timespec ts;
@@ -1162,8 +1289,11 @@ int main(int argc, char *argv[])
         ddebug("%d probes requested.", ret);
 
     print_probes(probes_list);
+    ohm_shutdown = false;
+    signal(SIGINT, ohm_cleanup);
+    signal(SIGTERM, ohm_cleanup);
 
-    switch(cpid = fork()) {
+    switch(ohm_cpid = fork()) {
         case -1:
             perror("fork");
             exit(EXIT_FAILURE);
@@ -1186,7 +1316,13 @@ int main(int argc, char *argv[])
                 }
             }
 
-            ddebug("Probing process %u.", cpid);
+#if HAVE_XPMEM
+            if (xpmem_attach_mem(ohm_cpid) < 0) {
+                derror("error mapping remote process's memory.");
+                goto error;
+            }
+#endif
+            ddebug("Probing process %u.", ohm_cpid);
             // create the unwind address space
             unw_addrspace = unw_create_addr_space(&_UPT_accessors, 0);
             if (!unw_addrspace) {
@@ -1195,7 +1331,7 @@ int main(int argc, char *argv[])
             }
 
             // create UPT-info structure
-            upt_info = _UPT_create(cpid);
+            upt_info = _UPT_create(ohm_cpid);
             if (!upt_info) {
                 derror("error creating _UPT-info structure.");
                 goto error;
@@ -1204,7 +1340,7 @@ int main(int argc, char *argv[])
             ts.tv_sec = (int) doctor_interval;
             ts.tv_nsec = (doctor_interval - ts.tv_sec) * 1E9;
 
-            while (!WIFEXITED(status) && !WIFSIGNALED(status)) {
+            while (!WIFEXITED(status) && !WIFSIGNALED(status) && !ohm_shutdown) {
                 ret = unw_init_remote(&unw_cursor, unw_addrspace, upt_info);
                 if (ret < 0) {
                     derror("error initializing remote upt ptrace.");
@@ -1215,7 +1351,7 @@ int main(int argc, char *argv[])
                     _UPT_resume(unw_addrspace, &unw_cursor, upt_info);
 
                 nanosleep(&ts, NULL);
-                if (kill(cpid, SIGSTOP) < 0)
+                if (kill(ohm_cpid, SIGSTOP) < 0)
                     perror("kill");
                 waitpid(-1, &status, 0);
 
@@ -1228,6 +1364,9 @@ int main(int argc, char *argv[])
             _UPT_destroy(upt_info);
     }
 
+#if HAVE_XPMEM
+    xpmem_detach_mem();
+#endif
     return 0;
 
 error:
