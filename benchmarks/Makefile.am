@@ -4,5 +4,8 @@ benchmarks_PROGRAMS = whetdc counting
 whetdc_SOURCES      = whetdc.c
 counting_SOURCES    = counting.c
 
-AM_CPPFLAGS         = $(DWARF_CFLAGS) -I$(top_srcdir)/include -D_POSIX_C_SOURCE=200809L
+whetdc_CFLAGS       = $(DWARF_CFLAGS) 
+counting_CFLAGS     = $(DWARF_CFLAGS) 
+
+AM_CPPFLAGS         = -I$(top_srcdir)/include -D_POSIX_C_SOURCE=200809L
 AM_LDFLAGS          = -static

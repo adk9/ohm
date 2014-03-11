@@ -9,7 +9,7 @@ AC_DEFUN([AX_CHECK_CMA],[
     AC_MSG_CHECKING([if user requested CMA support])
     if test "$enable_cma" = "yes" ; then
        	    AC_MSG_RESULT([yes])
-	    AC_CHECK_HEADER([sys/uio.h])
+	    AC_CHECK_HEADERS([sys/uio.h])
             AC_CHECK_FUNC(process_vm_readv,  [cma_readv=1], [cma_readv=0])
             AC_CHECK_FUNC(process_vm_writev, [cma_writev=1], [cma_writev=0])
             AS_IF([test "$cma_readv" != "1" -o "$cma_writev" != "1"],

@@ -5,7 +5,7 @@
 
 AC_PREREQ([2.65])
 AC_INIT([ohm], [1.0], [adkulkar@indiana.edu])
-AC_CONFIG_SRCDIR([src/doctor.c])
+AC_CONFIG_SRCDIR([src/ohmd.c])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])

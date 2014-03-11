@@ -14,4 +14,5 @@ AC_DEFUN([AX_CHECK_XPMEM],[
     else
        	    AC_MSG_RESULT([no])
     fi
+    AM_CONDITIONAL(ENABLE_XPMEM, test -n "$XPMEM_LIBS")
 ])

@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dwarf-util.h"
+#include "ohmd.h"
 
 int
 is_location_form(int form)
