@@ -2,11 +2,7 @@ probes = {}
 
 function probe (p)
    if p[1] and p[2] then
-      pprobe = {name=p[1],
-		freq=p[2],
-		handlers={},
-		buf={},
-		mt={}}
+      pprobe = {name=p[1], freq=p[2], handlers={}, buf={}, mt={}}
       setmetatable(pprobe, pprobe.mt)
       pprobe.mt.__index = function (table, key) return table.buf[key] end
       -- let's use a fixed window for now
@@ -26,24 +22,30 @@ end
 
 function ohm_add (tuples)
    local handlerset = {}
-   if type(tuples) == "table" then
-      for k, v in pairs(tuples) do
-	 local b = probes[k].buf
-	 -- add the value to the probe buffer
-	 table.insert(b, 1, v)
-	 b[b.maxlen+1] = nil
-	 -- collect handlers to run in a "set" since we do not want
-	 -- the same handler to run multiple times
-	 if probes[k].handlers then
-	    for _, h in pairs(probes[k].handlers)
-	    do handlerset[h] = true end
+   if type(tuples) ~= "table" then return end
+   for k, v in pairs(tuples) do
+      local b = probes[k].buf
+      -- add the value to the probe buffer only if it is different
+      if b[1] and type(b[1]) == "table" then
+	 local eq = false
+	 for x, y in pairs(b[1]) do
+	    if v[x] ~= y then eq = true break end
 	 end
+	 if not eq then break end
       end
-
-      -- execute all the handlers in separate coroutines
-      for fn, flag in pairs(handlerset) do
-	 -- fail silently
-	 if flag then pcall(fn) end
+      if b[1] == v then break end
+      table.insert(b, 1, v)
+      b[b.maxlen+1] = nil
+      -- collect handlers to run in a "set" since we do not want
+      -- the same handler to run multiple times
+      if not probes[k].handlers then break end
+      for _, h in pairs(probes[k].handlers) do
+	 if not handlerset[h] then
+	    -- execute all the handlers in separate coroutines
+	    local thd = coroutine.create(h)
+	    coroutine.resume(thd)
+	    handlerset[h] = true
+	 end
       end
    end
 end
