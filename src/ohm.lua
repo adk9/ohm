@@ -32,8 +32,7 @@ function ohm_add (tuples)
 	    if v[x] ~= y then eq = true break end
 	 end
 	 if not eq then break end
-      end
-      if b[1] == v then break end
+      elseif b[1] and b[1] == v then break end
       table.insert(b, 1, v)
       b[b.maxlen+1] = nil
       -- collect handlers to run in a "set" since we do not want
