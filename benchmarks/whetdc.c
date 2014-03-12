@@ -81,7 +81,6 @@ void P3(double X, double Y, double *Z);
 */
 double T,T1,T2,E1[5];
 int J,K,L;
-struct {int a; int b;} pair = {1, 2};
 
 int
 main(int argc, char *argv[])
