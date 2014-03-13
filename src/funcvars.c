@@ -17,11 +17,11 @@
 #include "ohmd.h"
 
 // Variable table
-variable_t   vars_table[DEFAULT_NUM_VARS];
+variable_t   vars_table[OHM_MAX_NUM_VARS];
 unsigned int vars_table_size;
 
 // Function table
-function_t   fns_table[DEFAULT_NUM_FUNCTIONS];
+function_t   fns_table[OHM_MAX_NUM_FUNCTIONS];
 unsigned int fns_table_size;
 
 // The "main" function
@@ -60,6 +60,15 @@ print_all_variables(void)
                is_addr(vars_table[i].loctype) ? "GLOBAL" : "STACK",
                is_addr(vars_table[i].loctype) ? vars_table[i].addr : vars_table[i].offset,
                vars_table[i].type->id);
+}
+
+void
+print_all_functions(void)
+{
+    int i;
+    for (i = 0; i < fns_table_size; i++)
+        ddebug("%d> %s 0x%lx-0x%lx", i, fns_table[i].name,
+               fns_table[i].lowpc, fns_table[i].hipc);
 }
 
 // check if the given "ip" spans within the given function f
@@ -269,8 +278,8 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
     Dwarf_Unsigned bsz = 0;
     Dwarf_Addr lowpc = 0, highpc = 0;
     variable_t *var;
-    int saw_lopc = 0;
-    int saw_hipc = 0;
+    int saw_lopc;
+    int saw_hipc;
 
     ret = dwarf_tag(child_die, &tag, &err);
     if (ret != DW_DLV_OK) {
@@ -336,6 +345,8 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                 vars_table_size++;
             break;
         case DW_TAG_subprogram:
+            saw_lopc = 0;
+            saw_hipc = 0;
             for (i = 0; i < attrcount; ++i) {
                 if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
                     derror("error in dwarf_whatattr()");
@@ -375,6 +386,8 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                     fns_table[fns_table_size].lowpc = lowpc;
                     fns_table[fns_table_size].hipc = highpc;
                     fns_table_size++;
+                    saw_lopc = 0;
+                    saw_hipc = 0;
                 }
             }
             break;

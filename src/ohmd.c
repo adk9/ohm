@@ -28,15 +28,8 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <libunwind-ptrace.h>
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
-#include <dwarf.h>
 #if HAVE_CMA && HAVE_SYS_UIO_H
 #include <sys/uio.h>
-#endif
-#if HAVE_XPMEM
-#include <xpmem.h>
 #endif
 
 #include "ohmd.h"
@@ -61,36 +54,6 @@ static lua_State *L;
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
 
-#if HAVE_XPMEM
-typedef struct ohm_seg_t ohm_seg_t;
-struct ohm_seg_t {
-    xpmem_segid_t seg;
-    xpmem_apid_t  ap;
-    void*         addr;   /* local virtual address */
-    void*         start;  /* remote virtual address */
-    unsigned long len;    /* length of the segment */
-    unsigned long perm;   /* permissions - octal value */
-};
-
-static int xpmem_nseg;    /* number of XPMEM segments */
-static ohm_seg_t xpmem_segs[128];
-#endif
-
-
-static inline void
-lua_pushohmvalue(lua_State *L, basetype_t *type, void *val)
-{
-    if (!strcmp(type->name, "double"))
-        lua_pushnumber(L, *((double *) val));
-    else if (!strcmp(type->name, "int"))
-        lua_pushnumber(L, *((int *) val));
-    else if (!strcmp(type->name, "char"))
-        lua_pushlstring(L, (const char *) val, type->nelem);
-    else if (!strcmp(type->name, "long int"))
-        lua_pushnumber(L, *((long int *) val));
-    else
-        derror("error pushing value: invalid basetype");
-}
 
 // scan for all types or variables and  function in a given file
 // "file". The debug information defined by the DWARF format is used
@@ -131,7 +94,6 @@ scan_file(char *file, dwarf_query_cb_t cb)
         if (dwarf_siblingof(dbg, NULL, &cu_die, &err) == DW_DLV_ERROR)
             derror("error getting sibling of cu.");
 
-        (*cb)(dbg, NULL, cu_die);
         traverse_die(cb, dbg, NULL, cu_die);
         dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
     }
@@ -205,98 +167,6 @@ error:
     return -1;
 }
 
-#if HAVE_XPMEM
-static int
-xpmem_copy(void *dst, void *src, size_t size)
-{
-    int i;
-    unsigned long offset;
-
-     for (i = 0; i < xpmem_nseg; i++) { 
-         if ((src >= xpmem_segs[i].start) && 
-             (src <= xpmem_segs[i].start+xpmem_segs[i].len-size)) { 
-             offset = src-xpmem_segs[i].start; 
-             memcpy(dst, xpmem_segs[i].addr+offset, size); 
-             return size; 
-         } 
-     } 
-     return -1;
-}
-
-static int
-xpmem_attach_mem(pid_t pid)
-{
-    FILE *file;
-    char buf[2048], name[256];
-    unsigned long vm_start;
-    unsigned long vm_end;
-    char r, w, x, p;
-    int n;
-    struct xpmem_addr addr;
-    ohm_seg_t *seg;
-
-    sprintf(buf, "/proc/%d/maps", pid);
-    file = fopen(buf, "r");
-    if (!file) {
-        perror("fopen");
-        return -1;
-    }
-
-    xpmem_nseg = 0;
-    while (fgets(buf, sizeof(buf), file) != NULL) {
-        n = sscanf(buf, "%lx-%lx %c%c%c%c %*lx %*s %*ld %255s", &vm_start, &vm_end,
-                   &r, &w, &x, &p, name);
-        if (n < 2) {
-            derror("unexpected line: %s\n", buf);
-            continue;
-        }
-
-        if (strcmp(name, "[heap]") && strcmp(name, "[stack]"))
-            continue;
-
-        seg = &xpmem_segs[xpmem_nseg++];
-        seg->perm = ((r=='r')*0444)+((w=='w')*0222)+((x=='x')*0111);
-        seg->start = (void*)vm_start;
-        seg->len = vm_end-vm_start;
-        seg->seg = xpmem_make(seg->start, seg->len, XPMEM_PERMIT_MODE,
-                              (void*)seg->perm);
-        if (seg->seg == -1) {
-            perror("xpmem_make");
-            return -1;
-        }
-
-        seg->ap = xpmem_get(seg->seg, (seg->perm==0444) ? XPMEM_RDONLY : XPMEM_RDWR,
-                            XPMEM_PERMIT_MODE, (void*)seg->perm);
-        if (seg->ap == -1) {
-            perror("xpmem_get");
-            return -1;
-        }
-
-        addr.apid = seg->ap;
-        addr.offset = 0;
-        seg->addr = xpmem_attach(addr, seg->len, 0);
-        ddebug("Registered segment %p ==> %p, len %lu", seg->addr, seg->start, seg->len);
-        if (seg->addr == (void*)-1 || seg->addr == MAP_FAILED) {
-            perror("xpmem_attach");
-            return -1;
-        }
-    }
-    fclose(file);
-    return 0;
-}
-
-static void
-xpmem_detach_mem(void)
-{
-    int i;
-    for (i = 0; i < xpmem_nseg; i++) {
-        xpmem_detach(xpmem_segs[i].addr);
-        xpmem_release(xpmem_segs[i].ap);
-        xpmem_remove(xpmem_segs[i].seg);
-    }
-}
-#endif
-
 static void
 usage(void)
 {
@@ -307,18 +177,17 @@ usage(void)
 }
 
 static int
-remote_read(probe_t *probe, addr_t addr, void *arg)
+remote_copy(void *dst, void *src, size_t size, void *arg)
 {
     int ret;
-    size_t size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
-    // ddebug("mem read from 0x%lx to %p, size (%lu)", addr, probe->buf, size);
+    // ddebug("mem read from %p to %p, size (%lu)", src, dst, size);
 
 #if HAVE_CMA
     struct iovec local[1], remote[1];
 
-    local[0].iov_base = probe->buf;
+    local[0].iov_base = dst;
     local[0].iov_len = size;
-    remote[0].iov_base = (void*)addr;
+    remote[0].iov_base = src;
     remote[0].iov_len = size;
     USED(arg);
     ret = 0;
@@ -327,12 +196,12 @@ remote_read(probe_t *probe, addr_t addr, void *arg)
     } while (ret > 0 && ret < size);
 #elif HAVE_XPMEM
     USED(arg);
-    ret = xpmem_copy(probe->buf, (void*)addr, size);
+    ret = xpmem_copy(dst, src, size);
 #else
     int i;
     for (i = 0; (i<<3) < size; i++)
-        ret = _UPT_access_mem(unw_addrspace, addr+(i<<3),
-                              (unw_word_t*)(probe->buf+(i<<3)), 0, arg);
+        ret = _UPT_access_mem(unw_addrspace, (unw_word_t*)(src+(i<<3)),
+                              (unw_word_t*)(dst+(i<<3)), 0, arg);
 #endif
     return ret;
 }
@@ -341,28 +210,33 @@ static int
 write_lua(probe_t *probe, addr_t addr, void *arg)
 {
     int ret, i;
-    size_t size;
+    basetype_t *t, *ot;
 
-    if (!probe)
+    if (!probe || !probe->var)
         return 0;
 
-    size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
-
-    lua_pushstring(L, probe->var->name);
-    if (probe->var->type->nelem > 1)
-        lua_newtable(L);
-
-    ret = remote_read(probe, addr, arg);
+    t = get_type_alias(probe->var->type);
+    ret = remote_copy(probe->buf, (void*)addr, get_type_size(t), arg);
     if (ret < 0)
         return ret;
 
-    for (i = 0; (i<<3) < size; i++) {
-        if (probe->var->type->nelem > 1)
+    lua_pushstring(L, probe->var->name);
+    if (is_array(t->ohm_type) || is_struct(t->ohm_type))
+        lua_newtable(L);
+
+    for (i = 0; i < get_type_nelem(t); i++) {
+        if (is_array(t->ohm_type)) {
+            ot = get_type_alias(t->elems[0]);
             lua_pushnumber(L, i+1);
+            lua_pushbuf(L, ot, probe->buf+(i*get_type_size(ot)));
+        } else if (is_struct(t->ohm_type)) {
+            ot = get_type_alias(t->elems[i]);
+            lua_pushstring(L, t->elems[i]->name);
+            lua_pushbuf(L, ot, probe->buf+(i*get_type_size(ot)));
+        } else
+            lua_pushbuf(L, t, probe->buf+i);
 
-        lua_pushohmvalue(L, probe->var->type, probe->buf+(i<<3));
-
-        if (probe->var->type->nelem > 1)
+        if (is_array(t->ohm_type) || is_struct(t->ohm_type))
             lua_rawset(L, -3);
     }
 
@@ -395,8 +269,7 @@ probe(void *arg)
                 // copy the cursor so we can move back
                 cur = unw_cursor;
                 do {
-                    // unwind the stack to read as many
-                    // probes as possible
+                    // unwind the stack to read as many probes as possible
                     unw_get_reg(&cur, UNW_REG_IP, &ip);
                     if (in_function(p->var->function, ip)) {
                         // Get the probe location
@@ -479,20 +352,22 @@ int main(int argc, char *argv[])
                argv[optind]);
         goto error;
     }
-    ddebug("%d base types found.", types_table_size);
-
     if ((ret = scan_file(argv[optind], &add_complextype_from_die)) < 0) {
         derror("error scanning types from %s. (compile with -g)",
                argv[optind]);
         goto error;
     }
-    ddebug("%d complex types found.", types_table_size);
-
+    ddebug("%d base/complex types found.", types_table_size);
+    // Since we do not topologically sort the DWARF graph, the
+    // information of some of the array types might be
+    // incorrect. We fix them here.
+    refresh_array_sizes();
+        
     // print the types table
-     for (c = 0; c < types_table_size; c++)
-         printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name,
-                types_table[c].nelem, types_table[c].size,
-                types_table[c].id);
+    /* for (c = 0; c < types_table_size; c++) */
+    /*     printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name, */
+    /*            types_table[c].nelem, types_table[c].size, */
+    /*            types_table[c].id); */
 
     //  next we look for the variables.
     if ((ret = scan_file(argv[optind], &add_var_from_die)) < 0) {
@@ -501,7 +376,10 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", vars_table_size);
-    print_all_variables();
+    // print_all_variables();
+    ddebug("%d functions found.", fns_table_size);
+    // print_all_functions();
+
 
     // And finally, we read the OHM prescription.
     ddebug("reading ohm prescription: %s.", ohmfile);

@@ -132,7 +132,9 @@ traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
     Dwarf_Die cur_die = child_die, child;
     Dwarf_Error err;
 
+    (*cb)(dbg, parent_die, child_die);
     n = 0;
+
     while (1) {
         Dwarf_Die sib_die = 0;
         ret = dwarf_child(cur_die, &child, &err);
@@ -140,7 +142,6 @@ traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
             derror("error in dwarf_child()");
             return -1;
         } else if (ret == DW_DLV_OK) {
-            (*cb)(dbg, cur_die, child);
             traverse_die(cb, dbg, cur_die, child);
         }
 
@@ -154,8 +155,8 @@ traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
         if (cur_die != child_die)
             dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
 
+        (*cb)(dbg, parent_die, sib_die);
         cur_die = sib_die;
-        (*cb)(dbg, parent_die, cur_die);
         n++;
     }
     return n-1;

@@ -12,6 +12,10 @@
 #include <dwarf.h>
 #include <libdwarf.h>
 
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+
 #define DEFAULT_OHMFILE         "default.ohm"
 #define DEFAULT_INTERVAL        3.0
 
@@ -21,26 +25,57 @@ typedef unsigned long addr_t;
 
 /* Types (base types and aggregate types) */
 
-#define DEFAULT_NUM_TYPES       256
+#define OHM_MAX_NUM_TYPES       256
+
+// OHM types.
+#define OHM_TYPE_UNSIGNED  (1<<0)
+#define OHM_TYPE_ARRAY     (1<<1)
+#define OHM_TYPE_STRUCT    (1<<2)
+#define OHM_TYPE_INT       (1<<3)
+#define OHM_TYPE_UINT      (1<<3)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_DOUBLE    (1<<4)
+#define OHM_TYPE_FLOAT     (1<<5)
+#define OHM_TYPE_CHAR      (1<<6)
+#define OHM_TYPE_UCHAR     (1<<6)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_LONG      (1<<7)
+#define OHM_TYPE_ULONG     (1<<7)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_LONG_INT  (1<<8)
+#define OHM_TYPE_LONG_UINT (1<<8)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_PTR       (1<<9)
+#define OHM_TYPE_ALIAS     (1<<10)
+
+// Convenience macros to determine OHM type.
+#define is_alias(v)    ((v) & OHM_TYPE_ALIAS)
+#define is_array(v)    ((v) & OHM_TYPE_ARRAY)
+#define is_struct(v)   ((v) & OHM_TYPE_STRUCT)
+#define is_unsigned(v) ((v) & OHM_TYPE_UNSIGNED)
+#define is_scalar(v)   ((v) >= OHM_TYPE_INT)
 
 typedef struct basetype_t basetype_t;
 struct basetype_t
 {
     unsigned int id;
+    short        ohm_type;
     char         name[128];
     size_t       size;
     unsigned int nelem;
     basetype_t **elems;
 };
 
-extern basetype_t   types_table[DEFAULT_NUM_TYPES];
+extern basetype_t   types_table[OHM_MAX_NUM_TYPES];
 extern unsigned int types_table_size;
 
 basetype_t* get_type(int id);
 
-inline size_t basetype_get_size(basetype_t *type);
+basetype_t* get_or_add_type(int id);
 
-inline unsigned int basetype_get_nelem(basetype_t *type);
+inline size_t get_type_size(basetype_t *type);
+
+inline unsigned int get_type_nelem(basetype_t *type);
+
+inline basetype_t* get_type_alias(basetype_t *type);
+
+inline int get_type_ohmtype(basetype_t *type);
 
 int add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
 
@@ -50,7 +85,7 @@ int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die di
 
 /* Functions */
 
-#define DEFAULT_NUM_FUNCTIONS   256
+#define OHM_MAX_NUM_FUNCTIONS   256
 
 typedef struct function_t function_t;
 struct function_t
@@ -60,16 +95,20 @@ struct function_t
     addr_t	hipc;
 };
 
-extern function_t   fns_table[DEFAULT_NUM_FUNCTIONS];
+extern function_t   fns_table[OHM_MAX_NUM_FUNCTIONS];
 extern unsigned int fns_table_size;
 
 extern function_t  *main_fn;
 
 function_t* get_function(char *name);
 
+void refresh_array_sizes(void);
+
 inline int in_function(function_t *f, unsigned long ip);
 
 inline int in_main(unsigned long ip);
+
+void print_all_functions(void);
 
 /**********************************************************************/
 
@@ -90,7 +129,7 @@ inline int in_main(unsigned long ip);
 
 /* Variables */
 
-#define DEFAULT_NUM_VARS        256
+#define OHM_MAX_NUM_VARS        256
 
 typedef struct variable_t variable_t;
 struct variable_t
@@ -105,7 +144,7 @@ struct variable_t
   };
 };
 
-extern variable_t   vars_table[DEFAULT_NUM_VARS];
+extern variable_t   vars_table[OHM_MAX_NUM_VARS];
 extern unsigned int vars_table_size;
 
 variable_t* get_variable(char *name);
@@ -171,6 +210,12 @@ int traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
 
 /**********************************************************************/
 
+/* Lua utility functions. */
+
+inline void lua_pushbuf(lua_State *L, basetype_t *type, void *val);
+
+/**********************************************************************/
+
 /* Convenience Macros */
 
 #define OHM_COLOR_ERROR "\x1b[31m"
@@ -195,6 +240,25 @@ extern int ohm_debug;
 #               undef USED
 #               define USED(x) ((void)(x))
 #       endif
+#endif
+
+/**********************************************************************/
+
+/* XPMEM support */
+
+#if HAVE_XPMEM
+
+#define OHM_MAX_XPMEM_SEGS  128
+
+// Single-copy from a remote processes's memory
+int xpmem_copy(void *dst, void *src, size_t size);
+
+// Attach to a remote XPMEM segment mapping it into our address space.
+int xpmem_attach_mem(pid_t pid);
+
+// Detach from a remote memory segment
+void xpmem_detach_mem(void);
+
 #endif
 
 /**********************************************************************/

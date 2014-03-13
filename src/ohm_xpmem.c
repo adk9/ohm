@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#if HAVE_XPMEM
 #include <xpmem.h>
+#endif
 
 #include "ohm_xpmem.h"
 

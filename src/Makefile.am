@@ -1,6 +1,10 @@
 bin_PROGRAMS   = ohmd
 
-ohmd_SOURCES   = ohmd.c dwarf-util.c types.c funcvars.c probes.c
+ohmd_SOURCES   = ohmd.c dwarf-util.c lua-util.c types.c funcvars.c probes.c
+
+if ENABLE_XPMEM
+ohmd_SOURCES  += xpmem.c
+endif
 
 AM_CPPFLAGS    = $(XPMEM_CFLAGS) -D_POSIX_C_SOURCE=200809L -I/usr/include -I$(top_srcdir)/include
 AM_LDFLAGS     = -static

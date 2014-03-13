@@ -34,7 +34,7 @@ new_probe(variable_t *var, bool active) {
     if (!var->type)
         return NULL;
 
-    p->buf = calloc(basetype_get_size(var->type), basetype_get_nelem(var->type));
+    p->buf = calloc(get_type_size(var->type), 1);
     if (!p->buf) {
         free(p);
         return NULL;
