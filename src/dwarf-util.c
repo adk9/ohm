@@ -128,20 +128,21 @@ int
 traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
              Dwarf_Die child_die)
 {
-    int ret = DW_DLV_ERROR;
+    int ret = DW_DLV_ERROR, n;
     Dwarf_Die cur_die = child_die, child;
     Dwarf_Error err;
 
-    (*cb)(dbg, parent_die, child_die);
-
+    n = 0;
     while (1) {
         Dwarf_Die sib_die = 0;
         ret = dwarf_child(cur_die, &child, &err);
         if (ret == DW_DLV_ERROR) {
             derror("error in dwarf_child()");
             return -1;
-        } else if (ret == DW_DLV_OK)
+        } else if (ret == DW_DLV_OK) {
+            (*cb)(dbg, cur_die, child);
             traverse_die(cb, dbg, cur_die, child);
+        }
 
         ret = dwarf_siblingof(dbg, cur_die, &sib_die, &err);
         if (ret == DW_DLV_ERROR) {
@@ -155,6 +156,7 @@ traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
 
         cur_die = sib_die;
         (*cb)(dbg, parent_die, cur_die);
+        n++;
     }
-    return 1;
+    return n-1;
 }

@@ -53,6 +53,48 @@ basetype_get_nelem(basetype_t *type)
         return type->nelem;
 }
 
+static int
+add_structmember_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
+{
+    int ret = DW_DLV_ERROR;
+    Dwarf_Error err = 0;
+    Dwarf_Half tag = 0;
+    Dwarf_Off offset = 0;
+    Dwarf_Unsigned tid = 0;
+
+    ret = dwarf_tag(die, &tag, &err);
+    if (ret != DW_DLV_OK) {
+        derror("error in dwarf_tag()");
+        goto error;
+    }
+
+    if (tag != DW_TAG_member)
+        return -1;
+
+    ret = get_offset_tid(die, &offset, &tid);
+    if (ret < 0) {
+        derror("error in get_offset_tid()");
+        goto error;
+    }
+
+    types_table[types_table_size].id = offset;
+    ret = get_child_name(dbg, die, types_table[types_table_size].name, 128);
+    if (ret < 0)
+        strncpy(types_table[types_table_size].name, "<unknown-structmbr>", 128);
+
+    types_table[types_table_size].size = 0;
+    types_table[types_table_size].nelem = 1;
+    types_table[types_table_size].elems = malloc(sizeof(basetype_t*));
+    types_table[types_table_size].elems[0] = get_type(tid);
+    types_table_size++;
+    return 1;
+
+error:
+    derror("error in add_structmember_from_die()");
+    return -1;   
+}
+
+
 int
 add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
 {
@@ -95,7 +137,7 @@ error:
 int
 add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
 {
-    int ret = DW_DLV_ERROR;
+    int ret = DW_DLV_ERROR, i;
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
     Dwarf_Half tag = 0;
@@ -160,13 +202,21 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                 goto error;
             }
 
+            // ensure that the struct members get added to the table
+            ret = traverse_die(&add_structmember_from_die, dbg, NULL, die);
+            if (ret < 0)
+                goto error;
+
             types_table[types_table_size].id = offset;
+            types_table[types_table_size].nelem = ret;
+            types_table[types_table_size].size = bsz;
+            types_table[types_table_size].elems = malloc(ret * sizeof(basetype_t*));
+            for (i = 0; i < ret; i++)
+                types_table[types_table_size].elems[i] = &types_table[types_table_size-ret+i];
+
             ret = get_child_name(dbg, die, types_table[types_table_size].name, 128);
             if (ret < 0)
                 strncpy(types_table[types_table_size].name, "<unknown-struct>", 128);
-            types_table[types_table_size].size = bsz;
-            types_table[types_table_size].nelem = 1;
-            types_table[types_table_size].elems = NULL;
             types_table_size++;
             break;
 

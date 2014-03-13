@@ -131,7 +131,8 @@ scan_file(char *file, dwarf_query_cb_t cb)
         if (dwarf_siblingof(dbg, NULL, &cu_die, &err) == DW_DLV_ERROR)
             derror("error getting sibling of cu.");
 
-        ret = traverse_die(cb, dbg, NULL, cu_die);
+        (*cb)(dbg, NULL, cu_die);
+        traverse_die(cb, dbg, NULL, cu_die);
         dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
     }
 
@@ -346,7 +347,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
         return 0;
 
     size = basetype_get_size(probe->var->type) * basetype_get_nelem(probe->var->type);
-    
+
     lua_pushstring(L, probe->var->name);
     if (probe->var->type->nelem > 1)
         lua_newtable(L);
