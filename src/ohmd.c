@@ -526,10 +526,10 @@ int main(int argc, char *argv[])
     ddebug("%d complex types found.", types_table_size);
 
     // print the types table
-    // for (c = 0; c < types_table_size; c++)
-    //     printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name,
-    //            types_table[c].nelem, types_table[c].size,
-    //            types_table[c].id);
+     for (c = 0; c < types_table_size; c++)
+         printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name,
+                types_table[c].nelem, types_table[c].size,
+                types_table[c].id);
 
     //  next we look for the variables.
     if ((ret = scan_file(argv[optind], &add_var_from_die)) < 0) {
@@ -538,7 +538,7 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", vars_table_size);
-    // print_all_variables();
+    print_all_variables();
 
     // And finally, we read the OHM prescription.
     ddebug("reading ohm prescription: %s.", ohmfile);
@@ -552,6 +552,7 @@ int main(int argc, char *argv[])
     ohm_shutdown = false;
     signal(SIGINT, ohm_cleanup);
     signal(SIGTERM, ohm_cleanup);
+    signal(SIGSEGV, ohm_cleanup);
 
     switch(ohm_cpid = fork()) {
         case -1:

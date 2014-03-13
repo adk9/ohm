@@ -56,9 +56,10 @@ print_all_variables(void)
 {
     int i;
     for (i = 0; i < vars_table_size; i++)
-        ddebug("%d> %s (%s) at 0x%lx", i, vars_table[i].name,
+        ddebug("%d> %s (%s) at 0x%lx (tid: %d)", i, vars_table[i].name,
                is_addr(vars_table[i].loctype) ? "GLOBAL" : "STACK",
-               is_addr(vars_table[i].loctype) ? vars_table[i].addr : vars_table[i].offset);
+               is_addr(vars_table[i].loctype) ? vars_table[i].addr : vars_table[i].offset,
+               vars_table[i].type->id);
 }
 
 // check if the given "ip" spans within the given function f

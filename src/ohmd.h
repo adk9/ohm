@@ -30,7 +30,7 @@ struct basetype_t
     char         name[128];
     size_t       size;
     unsigned int nelem;
-    bool         istypedef;
+    basetype_t **elems;
 };
 
 extern basetype_t   types_table[DEFAULT_NUM_TYPES];
@@ -83,9 +83,9 @@ inline int in_main(unsigned long ip);
 
 // Convenience macros to determine the location type
 // of the variable.
-#define  is_addr(v)   ((v) & (1<<0))
-#define is_fbreg(v)   ((v) & (1<<1))
-#define   is_reg(v)   ((v) & (1<<2))
+#define    is_addr(v) ((v) & (1<<0))
+#define   is_fbreg(v) ((v) & (1<<1))
+#define     is_reg(v) ((v) & (1<<2))
 #define is_literal(v) ((v) & (1<<3))
 
 /* Variables */
@@ -154,6 +154,9 @@ int get_child_name(Dwarf_Debug dbg, Dwarf_Die child, char *name, int size);
 // get name of a parent die (this also ensures the parent die is not a
 // compile unit
 int get_parent_name(Dwarf_Debug dbg, Dwarf_Die parent, char *name, int size);
+
+// get the offset and type ID of a die
+int get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid);
 
 /**********************************************************************/
 

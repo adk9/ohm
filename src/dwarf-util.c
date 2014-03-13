@@ -85,3 +85,27 @@ get_parent_name(Dwarf_Debug dbg, Dwarf_Die parent, char *name, int size)
     dwarf_dealloc(dbg, pname, DW_DLA_STRING);
     return 0;
 }
+
+int
+get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid)
+{
+    int ret;
+    Dwarf_Error err;
+    Dwarf_Attribute attr;
+
+    // get the offset
+    ret = dwarf_die_CU_offset(die, offset, &err);
+    if (ret == DW_DLV_ERROR)
+        return -1;
+
+    // get the type
+    ret = dwarf_attr(die, DW_AT_type, &attr, &err);
+    if (ret == DW_DLV_ERROR)
+        return -1;
+
+    if (ret == DW_DLV_OK)
+        if ((dwarf_formref(attr, tid, &err)) != DW_DLV_OK)
+            return -1;
+
+    return 0;
+}
