@@ -24,6 +24,20 @@ is_location_form(int form)
     return 0;
 }
 
+int
+is_base_type(Dwarf_Die die)
+{
+    int ret;
+    Dwarf_Error err = 0;
+    Dwarf_Half tag = 0;
+
+    ret = dwarf_tag(die, &tag, &err);
+    if (ret != DW_DLV_OK)
+        return -1;
+
+    return (tag == DW_TAG_base_type);
+}
+
 void
 get_number(Dwarf_Attribute attr, Dwarf_Unsigned *val)
 {
@@ -108,4 +122,39 @@ get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid)
             return -1;
 
     return 0;
+}
+
+int
+traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
+             Dwarf_Die child_die)
+{
+    int ret = DW_DLV_ERROR;
+    Dwarf_Die cur_die = child_die, child;
+    Dwarf_Error err;
+
+    (*cb)(dbg, parent_die, child_die);
+
+    while (1) {
+        Dwarf_Die sib_die = 0;
+        ret = dwarf_child(cur_die, &child, &err);
+        if (ret == DW_DLV_ERROR) {
+            derror("error in dwarf_child()");
+            return -1;
+        } else if (ret == DW_DLV_OK)
+            traverse_die(cb, dbg, cur_die, child);
+
+        ret = dwarf_siblingof(dbg, cur_die, &sib_die, &err);
+        if (ret == DW_DLV_ERROR) {
+            derror("error in dwarf_siblingof()");
+            return -1;
+        } else if (ret == DW_DLV_NO_ENTRY)
+            break;
+
+        if (cur_die != child_die)
+            dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
+
+        cur_die = sib_die;
+        (*cb)(dbg, parent_die, cur_die);
+    }
+    return 1;
 }

@@ -145,6 +145,9 @@ void print_probes(probe_t *probe);
 // determine whether the given DWARF form is a location
 int is_location_form(int form);
 
+// check if the type represented by @die@ is a scalar type or not.
+int is_base_type(Dwarf_Die die);
+
 // get the number denoted by a DWARF attribute 'attr'
 void get_number(Dwarf_Attribute attr, Dwarf_Unsigned *val);
 
@@ -157,6 +160,14 @@ int get_parent_name(Dwarf_Debug dbg, Dwarf_Die parent, char *name, int size);
 
 // get the offset and type ID of a die
 int get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid);
+
+// Callback function that represents the DWARF query operation.
+typedef int (*dwarf_query_cb_t)(Dwarf_Debug, Dwarf_Die, Dwarf_Die);
+
+// traverse a die and all of its children while invoking a callback
+// function on each child die.
+int traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
+                 Dwarf_Die child_die);
 
 /**********************************************************************/
 

@@ -59,16 +59,9 @@ add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
     int ret = DW_DLV_ERROR;
     Dwarf_Error err = 0;
     Dwarf_Off offset = 0;
-    Dwarf_Half tag = 0;
     Dwarf_Unsigned bsz = 0;
 
-    ret = dwarf_tag(die, &tag, &err);
-    if (ret != DW_DLV_OK) {
-        derror("error in dwarf_tag()");
-        goto error;
-    }
-
-    if (tag != DW_TAG_base_type)
+    if (is_base_type(die) != 1)
         return -1;
 
     ret = dwarf_die_CU_offset(die, &offset, &err);

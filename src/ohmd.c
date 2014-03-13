@@ -76,9 +76,6 @@ static int xpmem_nseg;    /* number of XPMEM segments */
 static ohm_seg_t xpmem_segs[128];
 #endif
 
-// Callback function that represents the DWARF query operation.
-typedef int (*dwarf_query_cb_t)(Dwarf_Debug, Dwarf_Die, Dwarf_Die);
-
 
 static inline void
 lua_pushohmvalue(lua_State *L, basetype_t *type, void *val)
@@ -93,41 +90,6 @@ lua_pushohmvalue(lua_State *L, basetype_t *type, void *val)
         lua_pushnumber(L, *((long int *) val));
     else
         derror("error pushing value: invalid basetype");
-}
-
-static int
-traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
-             Dwarf_Die child_die)
-{
-    int ret = DW_DLV_ERROR;
-    Dwarf_Die cur_die = child_die, child;
-    Dwarf_Error err;
-
-    (*cb)(dbg, parent_die, child_die);
-
-    while (1) {
-        Dwarf_Die sib_die = 0;
-        ret = dwarf_child(cur_die, &child, &err);
-        if (ret == DW_DLV_ERROR) {
-            derror("error in dwarf_child()");
-            return -1;
-        } else if (ret == DW_DLV_OK)
-            traverse_die(cb, dbg, cur_die, child);
-
-        ret = dwarf_siblingof(dbg, cur_die, &sib_die, &err);
-        if (ret == DW_DLV_ERROR) {
-            derror("error in dwarf_siblingof()");
-            return -1;
-        } else if (ret == DW_DLV_NO_ENTRY)
-            break;
-
-        if (cur_die != child_die)
-            dwarf_dealloc(dbg, cur_die, DW_DLA_DIE);
-
-        cur_die = sib_die;
-        (*cb)(dbg, parent_die, cur_die);
-    }
-    return 1;
 }
 
 // scan for all types or variables and  function in a given file
