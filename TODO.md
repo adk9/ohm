@@ -1,14 +1,14 @@
 TODO
 ----
 
-- [ ] xpmem
+- [X] xpmem
 - [X] cross-memory attach
+- [X] loclists for accurate on-stack variable addresses
+- [X] Drop redundant updates.  
 - [ ] case studies: ornl MD, viz
 - [ ] distributed monitoring (mrnet, cci, mpi)
 - [ ] asynchronous monitoring: debug registers, lttng ust, DynInst API
-- [ ] loclists for accurate on-stack variable addresses
 - [ ] Terra support
-- [ ] Drop redundant updates.  
 - [ ] Generate callgraph from DWARF
 
 ----------
