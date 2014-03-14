@@ -25,24 +25,26 @@ typedef unsigned long addr_t;
 
 /* Types (base types and aggregate types) */
 
-#define OHM_MAX_NUM_TYPES       256
+#define OHM_MAX_NUM_TYPES       2048
 
 // OHM types.
-#define OHM_TYPE_UNSIGNED  (1<<0)
-#define OHM_TYPE_ARRAY     (1<<1)
-#define OHM_TYPE_STRUCT    (1<<2)
-#define OHM_TYPE_INT       (1<<3)
-#define OHM_TYPE_UINT      (1<<3)+OHM_TYPE_UNSIGNED
-#define OHM_TYPE_DOUBLE    (1<<4)
-#define OHM_TYPE_FLOAT     (1<<5)
-#define OHM_TYPE_CHAR      (1<<6)
-#define OHM_TYPE_UCHAR     (1<<6)+OHM_TYPE_UNSIGNED
-#define OHM_TYPE_LONG      (1<<7)
-#define OHM_TYPE_ULONG     (1<<7)+OHM_TYPE_UNSIGNED
-#define OHM_TYPE_LONG_INT  (1<<8)
-#define OHM_TYPE_LONG_UINT (1<<8)+OHM_TYPE_UNSIGNED
-#define OHM_TYPE_PTR       (1<<9)
-#define OHM_TYPE_ALIAS     (1<<10)
+#define OHM_TYPE_UNSIGNED   (1<<0)
+#define OHM_TYPE_ARRAY      (1<<1)
+#define OHM_TYPE_STRUCT     (1<<2)
+#define OHM_TYPE_INT        (1<<3)
+#define OHM_TYPE_UINT       (1<<3)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_DOUBLE     (1<<4)
+#define OHM_TYPE_FLOAT      (1<<5)
+#define OHM_TYPE_CHAR       (1<<6)
+#define OHM_TYPE_UCHAR      (1<<6)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_LONG       (1<<7)
+#define OHM_TYPE_ULONG      (1<<7)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_LONG_LONG  (1<<8)
+#define OHM_TYPE_LONG_ULONG (1<<8)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_SHORT_INT  (1<<9)
+#define OHM_TYPE_SHORT_UINT (1<<9)+OHM_TYPE_UNSIGNED
+#define OHM_TYPE_PTR        (1<<10)
+#define OHM_TYPE_ALIAS      (1<<11)
 
 // Convenience macros to determine OHM type.
 #define is_alias(v)    ((v) & OHM_TYPE_ALIAS)
@@ -85,7 +87,7 @@ int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die di
 
 /* Functions */
 
-#define OHM_MAX_NUM_FUNCTIONS   256
+#define OHM_MAX_NUM_FUNCTIONS   2048
 
 typedef struct function_t function_t;
 struct function_t
@@ -129,7 +131,7 @@ void print_all_functions(void);
 
 /* Variables */
 
-#define OHM_MAX_NUM_VARS        256
+#define OHM_MAX_NUM_VARS        2048
 
 typedef struct variable_t variable_t;
 struct variable_t
