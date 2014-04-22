@@ -24,6 +24,10 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
+# Check for the MPI compiler.
+LX_FIND_MPI
+AM_CONDITIONAL([HAVE_MPI], [test "x$have_C_mpi" == xyes])
+
 # Checks for libraries.
 AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_LIB([elf], [elf_begin])
