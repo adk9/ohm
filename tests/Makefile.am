@@ -1,5 +1,5 @@
-benchmarksdir       = $(datarootdir)/doc/@PACKAGE@
-benchmarks_PROGRAMS = whetdc counting
+testsdir            = $(datarootdir)/doc/@PACKAGE@
+tests_PROGRAMS      = whetdc counting
 
 whetdc_SOURCES      = whetdc.c
 counting_SOURCES    = counting.c

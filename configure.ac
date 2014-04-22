@@ -170,6 +170,6 @@ AS_IF([test "x$enable_debug" != xno],
 AM_CONDITIONAL(DEBUG_BUILD, test x"$enable_debug" = xyes)
 
 AC_CONFIG_FILES([Makefile
-                 benchmarks/Makefile
+                 tests/Makefile
                  src/Makefile])
 AC_OUTPUT

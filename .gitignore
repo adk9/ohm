@@ -67,8 +67,9 @@ src/.libs
 src/Makefile
 src/Makefile.in
 src/ohmd
-benchmarks/Makefile
-benchmarks/Makefile.in
-benchmarks/.deps
-benchmarks/whetdc
-benchmarks/counting
+tests/Makefile
+tests/Makefile.in
+tests/.deps
+tests/whetdc
+tests/counting
+tests/mpi-counting
