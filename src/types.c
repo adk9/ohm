@@ -252,19 +252,14 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
                 goto error;
             }
 
-            ret = dwarf_bytesize(die, &bsz, &err);
-            if (ret != DW_DLV_OK) {
-                derror("error in dwarf_bytesize()");
-                goto error;
-            }
-
             t = get_or_add_type(offset);
             strncpy(t->name, "struct ", 7);
             ret = get_child_name(dbg, die, t->name+7, 128);
             if (ret < 0)
                 strncpy(t->name, "<unknown-struct>", 128);
             t->ohm_type = OHM_TYPE_STRUCT;
-            t->size = bsz;
+            ret = dwarf_bytesize(die, &bsz, &err);
+            t->size = ((ret == DW_DLV_OK) ? bsz : 0);
 
             // ensure that struct members get added to the table
             nsib = traverse_die(&add_structmember_from_die, dbg, parent_die, die);
