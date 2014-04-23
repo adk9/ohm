@@ -9,6 +9,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <signal.h>
 
 #include "ohmd.h"
 
@@ -47,6 +49,6 @@ lua_pushbuf(lua_State *L, basetype_t *type, void *val)
             break;
         default:
             derror("invalid probe data type.");
-            exit(EXIT_FAILURE);
+            kill(0, SIGTERM);
     }
 }
