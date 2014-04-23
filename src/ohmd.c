@@ -170,9 +170,9 @@ error:
 static void
 usage(void)
 {
-    fprintf(stderr, "usage: " PACKAGE_NAME " [-D] [-o ohmfile]\n"
-                    "\t [-i interval] <program> <args>\n\n");
-    fprintf(stderr, "Report bugs to " PACKAGE_BUGREPORT);
+    fprintf(stderr, "usage: " PACKAGE_NAME " [-D] [-o ohmfile]"
+                    " [-i interval] <program> <args>\n\n");
+    fprintf(stderr, "Report bugs to: " PACKAGE_BUGREPORT ".");
     exit(1);
 }
 
@@ -180,7 +180,7 @@ static int
 remote_copy(void *dst, void *src, size_t size, void *arg)
 {
     int ret;
-    // ddebug("mem read from %p to %p, size (%lu)", src, dst, size);
+    ddebug("mem read from %p to %p, size (%lu)", src, dst, size);
 
 #if HAVE_CMA
     struct iovec local[1], remote[1];
