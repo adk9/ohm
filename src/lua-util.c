@@ -48,7 +48,7 @@ lua_pushbuf(lua_State *L, basetype_t *type, void *val)
             lua_pushnumber(L, *((long unsigned int *) val));
             break;
         default:
-            derror("invalid probe data type.");
+            derror("invalid probe data type (%d).", type->ohm_type);
             kill(0, SIGTERM);
     }
 }

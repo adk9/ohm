@@ -19,6 +19,7 @@ LT_INIT
 
 AC_LANG([C])
 
+CFLAGS="-O0"
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
