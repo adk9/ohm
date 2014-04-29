@@ -22,29 +22,36 @@ end
 
 function ohm_add (tuples)
    local handlerset = {}
-   if type(tuples) ~= "table" then return end
+   -- if type(tuples) ~= "table" then return end
    for k, v in pairs(tuples) do
       local b = probes[k].buf
-      -- add the value to the probe buffer only if it is different
-      if b[1] and type(b[1]) == "table" then
-	 local eq = false
-	 for x, y in pairs(b[1]) do
-	    if v[x] ~= y then eq = true break end
-	 end
-	 if not eq then break end
-      elseif b[1] and b[1] == v then break end
-      table.insert(b, 1, v)
-      b[b.maxlen+1] = nil
+      -- add the value to the probe buffer only if it has changed.
+      local skip = false
+      if b[1] then
+	 if type(b[1]) == "table" and type(v) == "table" then
+	    for x, y in pairs(b[1]) do
+	       if v[x] ~= y then skip = true break end
+	    end
+	 elseif b[1] == v then skip = true end
+      end
+
+      if not skip then
+	 table.insert(b, 1, v)
+	 b[b.maxlen+1] = nil
+      end
+
       -- collect handlers to run in a "set" since we do not want
       -- the same handler to run multiple times
       if not probes[k].handlers then break end
       for _, h in pairs(probes[k].handlers) do
 	 if not handlerset[h] then
-	    -- execute all the handlers in separate coroutines
-	    local thd = coroutine.create(h)
-	    coroutine.resume(thd)
 	    handlerset[h] = true
 	 end
       end
+   end
+   for h, _ in pairs(handlerset) do
+      -- execute all the handlers in separate coroutines
+      local thd = coroutine.create(h)
+      coroutine.resume(thd)
    end
 end

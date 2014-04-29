@@ -1,6 +1,6 @@
-CTR  = probe {"count", 1.0}
+count  = probe {"count", 1.0}
 limit  = probe {"limit", 1.0}
 rank  = probe {"main.rank", 1.0}
 size  = probe {"main.size", 1.0}
 
-rule{CTR} { function () print("OHM count = " .. CTR[1] .. " limit = " .. limit[1] .. " rank = " .. rank[1] .. " size = " .. size[1]) end }
+rule{count} { function () print("OHM count = " .. count[1] .. " limit = " .. limit[1] .. " rank = " .. rank[1] .. " size = " .. size[1]) end }

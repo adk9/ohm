@@ -180,7 +180,7 @@ static int
 remote_copy(void *dst, void *src, size_t size, void *arg)
 {
     int ret;
-    ddebug("mem read from %p to %p, size (%lu)", src, dst, size);
+    // ddebug("mem read from %p to %p, size (%lu)", src, dst, size);
 
 #if HAVE_CMA
     struct iovec local[1], remote[1];
@@ -213,7 +213,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     basetype_t *t, *ot;
 
     if (!probe || !probe->var)
-        return 0;
+        return -1;
 
     t = get_type_alias(probe->var->type);
     ret = remote_copy(probe->buf, (void*)addr, get_type_size(t), arg);
