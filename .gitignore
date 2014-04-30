@@ -73,3 +73,4 @@ tests/.deps
 tests/whetdc
 tests/counting
 tests/mpi-counting
+tests/fn-tracer
