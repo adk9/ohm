@@ -120,6 +120,7 @@ ohmread(char *path, probe_t **probes)
     int         np;
     char       *probe;
     variable_t *v;
+    function_t *f;
     probe_t    *p;
 
     np = 0;
@@ -150,8 +151,13 @@ ohmread(char *path, probe_t **probes)
         lua_pop(L, 1);
         v = get_variable(probe);
         if (!v) {
-            ddebug("Skipping non-existent probe %s.", probe);
-            continue;
+            // if it is not a variable, check whether a function probe
+            // is requested.
+            f = get_function(probe);
+            if (!f) {
+                ddebug("Skipping non-existent probe %s.", probe);
+                continue;
+            }
         }
 
         p = new_probe(v, 1);
@@ -376,10 +382,9 @@ int main(int argc, char *argv[])
         goto error;
     }
     ddebug("%d variables found.", vars_table_size);
-    // print_all_variables();
+    print_all_variables();
     ddebug("%d functions found.", fns_table_size);
-    // print_all_functions();
-
+    print_all_functions();
 
     // And finally, we read the OHM prescription.
     ddebug("reading ohm prescription: %s.", ohmfile);
