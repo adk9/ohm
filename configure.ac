@@ -7,8 +7,8 @@ AC_PREREQ([2.65])
 AC_INIT([ohm], [1.0], [adkulkar@indiana.edu])
 AC_CONFIG_SRCDIR([src/ohmd.c])
 AC_CONFIG_HEADERS([src/config.h])
+AC_CONFIG_MACRO_DIRS([config])
 AC_CONFIG_AUX_DIR([config])
-AC_CONFIG_MACRO_DIR([config])
 AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([1.9 dist-bzip2 subdir-objects foreign tar-ustar -Wall -Werror])
@@ -120,12 +120,12 @@ AM_CONDITIONAL([BUILD_LIBUNWIND], [test "x$build_libunwind" == "xyes"])
 # detect lua
 AX_PROG_LUA([5.0],[],[
     AX_LUA_HEADERS([
-        AX_LUA_LIBS([
-            AC_DEFINE([HAVE_LUA], [1], [Found Lua])
-            HAVE_LUA=yes
-        ],[AC_MSG_ERROR([cannot find lua libs])])
+        AX_LUA_LIBS([have_lua=1],
+                    [AC_MSG_ERROR([cannot find lua libs])
+                     have_lua=0])
     ],[AC_MSG_ERROR([cannot find lua headers])])
 ],[AC_MSG_ERROR([cannot find lua >= 5.0])])
+AC_DEFINE([HAVE_LUA], [$have_lua], [Found Lua])
 
 # detect cross-memory attach support
 AX_CHECK_CMA
