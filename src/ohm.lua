@@ -1,3 +1,5 @@
+local inspect = require 'inspect'
+
 probes = {}
 
 function probe (p)
@@ -29,8 +31,9 @@ function ohm_add (tuples)
       local skip = false
       if b[1] then
 	 if type(b[1]) == "table" and type(v) == "table" then
+            skip = true
 	    for x, y in pairs(b[1]) do
-	       if v[x] ~= y then skip = true break end
+	       if v[x] ~= y then skip = false break end
 	    end
 	 elseif b[1] == v then skip = true end
       end
