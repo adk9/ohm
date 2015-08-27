@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2004-2006 The Trustees of Indiana University and Indiana
- *                         University Research and Technology
- *                         Corporation.  All rights reserved.
- */
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,9 +19,11 @@ int main(int argc, char* argv[])
   
     printf("Counting demo starting with pid %d\n", (int)getpid());
 
-    for (ctr.count = 0; ctr.count < ctr.limit; ++ctr.count) {
+    int i;
+    for (i = 0; i < ctr.limit; ++i) {
         printf("Count = %d\n", ctr.count);
         sleep(2);
+        ++ctr.count;
     }
     return 0;
 }
