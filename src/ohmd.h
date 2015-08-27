@@ -164,7 +164,7 @@ typedef struct probe_t probe_t;
 struct probe_t
 {
     variable_t *var;         // the variable.
-    void       *buf;         // this is a buffer we read data into.
+    char       *buf;         // this is a buffer we read data into.
     bool        status;      // status of the probe.
     probe_t    *next;        // linked list of probes.
 };

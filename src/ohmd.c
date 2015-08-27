@@ -206,8 +206,8 @@ remote_copy(void *dst, void *src, size_t size, void *arg)
 #else
     int i;
     for (i = 0; (i<<3) < size; i++)
-        ret = _UPT_access_mem(unw_addrspace, (unw_word_t*)(src+(i<<3)),
-                              (unw_word_t*)(dst+(i<<3)), 0, arg);
+        ret = _UPT_access_mem(unw_addrspace, (unw_word_t)((char*)src+(i<<3)),
+                              (unw_word_t*)((char*)dst+(i<<3)), 0, arg);
 #endif
     return ret;
 }
