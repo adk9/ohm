@@ -117,6 +117,7 @@ add_structmember_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
     Dwarf_Half tag = 0;
     Dwarf_Off offset = 0;
     Dwarf_Unsigned tid = 0;
+    Dwarf_Unsigned loc = 0;
     basetype_t *t, *t2;
 
     ret = dwarf_tag(die, &tag, &err);
@@ -138,8 +139,15 @@ add_structmember_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
     ret = get_child_name(dbg, die, t->name, 128);
     if (ret < 0)
         strncpy(t->name, "<unknown-structmbr>", 128);
-    t->size = 0;
     t->ohm_type = OHM_TYPE_ALIAS;
+    ret = get_member_location(die, &loc);
+    if (ret < 0) {
+        derror("error in get_member_location()");
+        goto error;
+    }
+    // this is the struct member location and not the size; we will
+    // fix it later in refresh_compound_sizes.
+    t->size = loc;
 
     t2 = get_or_add_type(tid);
     t->nelem = 1;
@@ -268,7 +276,7 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
             t->nelem = nsib;
             t->elems = malloc(nsib*sizeof(t));
             for (i = 0; i < nsib; i++)
-                t->elems[i] = &types_table[types_table_size-nsib+i];
+                t->elems[i] = &types_table[types_table_size-nsib-1+i];
             break;
 
         case DW_TAG_typedef:
@@ -320,12 +328,22 @@ error:
 }
 
 void
-refresh_array_sizes(void) {
-    int c, sz;
+refresh_compound_sizes(void) {
+    int c, sz, i, nmemb;
+    basetype_t *t0, *t1;
     for (c = 0; c < types_table_size; c++) {
         if(is_array(types_table[c].ohm_type)) {
             sz = get_type_size(types_table[c].elems[0]);
             types_table[c].size = types_table[c].nelem * sz;
+        } else if (is_struct(types_table[c].ohm_type)) {
+            nmemb = types_table[c].nelem;
+            for (i = 0; i < nmemb-1; ++i) {
+                t0 = types_table[c].elems[i];
+                t1 = types_table[c].elems[i+1];
+                t0->size = t1->size - t0->size;
+            }
+            t0 = types_table[c].elems[nmemb-1];
+            t0->size = types_table[c].size - t0->size;
         }
     }
 }

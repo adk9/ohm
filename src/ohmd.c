@@ -230,15 +230,18 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     if (is_array(t->ohm_type) || is_struct(t->ohm_type))
         lua_newtable(L);
 
+    int offset = 0;
     for (i = 0; i < get_type_nelem(t); i++) {
         if (is_array(t->ohm_type)) {
             ot = get_type_alias(t->elems[0]);
             lua_pushnumber(L, i+1);
-            lua_pushbuf(L, ot, probe->buf+(i*get_type_size(ot)));
+            lua_pushbuf(L, ot, probe->buf+offset);
+            offset += get_type_size(ot);
         } else if (is_struct(t->ohm_type)) {
             ot = get_type_alias(t->elems[i]);
             lua_pushstring(L, t->elems[i]->name);
-            lua_pushbuf(L, ot, probe->buf+(i*get_type_size(ot)));
+            lua_pushbuf(L, ot, probe->buf+offset);
+            offset += t->elems[i]->size;
         } else
             lua_pushbuf(L, t, probe->buf+i);
 
@@ -365,9 +368,9 @@ int main(int argc, char *argv[])
     }
     ddebug("%d base/complex types found.", types_table_size);
     // Since we do not topologically sort the DWARF graph, the
-    // information of some of the array types might be
+    // information of some of the array/struct types might be
     // incorrect. We fix them here.
-    refresh_array_sizes();
+    refresh_compound_sizes();
         
     // print the types table
     /* for (c = 0; c < types_table_size; c++) */

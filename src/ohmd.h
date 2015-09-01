@@ -102,7 +102,7 @@ extern function_t  *main_fn;
 
 function_t* get_function(char *name);
 
-void refresh_array_sizes(void);
+void refresh_compound_sizes(void);
 
 inline int in_function(function_t *f, unsigned long ip);
 
@@ -199,6 +199,9 @@ int get_parent_name(Dwarf_Debug dbg, Dwarf_Die parent, char *name, int size);
 
 // get the offset and type ID of a die
 int get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid);
+
+// get the byte offsets (locations) of struct members
+int get_member_location(Dwarf_Die die, Dwarf_Unsigned *loc);
 
 // Callback function that represents the DWARF query operation.
 typedef int (*dwarf_query_cb_t)(Dwarf_Debug, Dwarf_Die, Dwarf_Die);
