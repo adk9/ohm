@@ -125,6 +125,24 @@ get_offset_tid(Dwarf_Die die, Dwarf_Off *offset, Dwarf_Unsigned *tid)
 }
 
 int
+get_member_location(Dwarf_Die die, Dwarf_Unsigned *loc)
+{
+    int ret;
+    Dwarf_Error err;
+    Dwarf_Attribute attr;
+
+    ret = dwarf_attr(die, DW_AT_data_member_location, &attr, &err);
+    if (ret == DW_DLV_ERROR) {
+        derror("error in dwarf_attr(DW_AT_data_member_location)");
+        return -1;
+    } else if (ret == DW_DLV_OK) {
+        get_number(attr, loc);
+        return 0;
+    }
+    return 0;
+}
+
+int
 traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
              Dwarf_Die child_die)
 {
