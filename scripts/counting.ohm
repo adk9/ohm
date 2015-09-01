@@ -1,3 +1,3 @@
 CTR  = probe {"ctr", 1.0}
 
-rule{CTR} { function () print("OHM count = " .. CTR[1]["count"] .. " limit = " .. CTR[1]["limit"]) end }
+rule{CTR} { function () print("OHM count = " .. CTR[1]["count"] .. " limit = " .. CTR[1]["limit"] .. " pcount = " .. CTR[1]["pcount"]) end }
