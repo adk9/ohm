@@ -2,7 +2,7 @@ local inspect = require 'inspect'
 
 probes = {}
 
-function probe (p)
+function var (p)
    if p[1] and p[2] then
       pprobe = {name=p[1], freq=p[2], handlers={}, buf={}, mt={}}
       setmetatable(pprobe, pprobe.mt)
