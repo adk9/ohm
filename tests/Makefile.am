@@ -1,5 +1,9 @@
 testsdir             = $(datarootdir)/doc/@PACKAGE@
-tests_PROGRAMS       = whetdc counting mpi-counting fn-tracer
+tests_PROGRAMS       = whetdc counting fn-tracer
+
+if HAVE_MPI
+tests_PROGRAMS      += mpi-counting
+endif
 
 whetdc_SOURCES       = whetdc.c
 whetdc_CFLAGS        = $(DWARF_CFLAGS) 
