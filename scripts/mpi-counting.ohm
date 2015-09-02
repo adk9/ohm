@@ -1,7 +1,7 @@
-count = var{"count", 1.0}
-limit = var{"limit", 1.0}
-rank  = var{"main.rank", 1.0}
-size  = var{"main.size", 1.0}
+count = probe {"count", 1.0}
+limit = probe {"limit", 1.0}
+rank  = probe {"main.rank", 1.0}
+size  = probe {"main.size", 1.0}
 
 rule{count} {
    function ()

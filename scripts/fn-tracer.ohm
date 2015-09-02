@@ -1,5 +1,5 @@
-incr  = var{"_incr", 1.0}
-decr  = var{"_decr", 1.0}
+incr  = probe {"_incr", 1.0}
+decr  = probe {"_decr", 1.0}
 
 rule{incr} { function () print("_incr() called") end }
 rule{decr} { function () print("_decr() called") end }
