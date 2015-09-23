@@ -359,7 +359,7 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                         } else {
                             newvar->offset = var->offset + size;
                         }
-                        size = type->elems[i]->size;
+                        size += type->elems[i]->size;
                         vars_table_size++;
                     }
                 }
