@@ -280,6 +280,7 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
     variable_t *var;
     int saw_lopc;
     int saw_hipc;
+    size_t size;
 
     ret = dwarf_tag(child_die, &tag, &err);
     if (ret != DW_DLV_OK) {
@@ -336,13 +337,34 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                             var->function = NULL;
                         }
                     }
-                    
                     var->type = get_type(offset);
                 }
             }
             // skip variables whose types we cannot figure out.
-            if (var->type)
+            if (var->type) {
                 vars_table_size++;
+                // now we know the type. if it is a struct, hoist the
+                // members up as variables
+                basetype_t *type = get_type_alias(var->type);
+                if (is_struct(type->ohm_type)) {
+                    size = 0;
+                    for (i = 0; i < type->nelem; ++i) {
+                        variable_t *newvar = &vars_table[vars_table_size];
+                        sprintf(newvar->name, "%s.%s", var->name, type->elems[i]->name);
+                        newvar->type = type->elems[i];
+                        newvar->function = var->function;
+                        newvar->loctype = var->loctype;
+                        if (is_addr(var->loctype)) {
+                            newvar->addr = var->addr + size;
+                        } else {
+                            newvar->offset = var->offset + size;
+                        }
+                        size = type->elems[i]->size;
+                        vars_table_size++;
+                    }
+                }
+
+            }
             break;
         case DW_TAG_subprogram:
             saw_lopc = 0;

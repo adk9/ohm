@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
     // information of some of the array/struct types might be
     // incorrect. We fix them here.
     refresh_compound_sizes();
-        
+
     // print the types table
     /* for (c = 0; c < types_table_size; c++) */
     /*     printf("%d :: %s[%d] %lu (TID %d)\n", c, types_table[c].name, */

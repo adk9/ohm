@@ -85,7 +85,7 @@ int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die di
 
 /* Functions */
 
-#define OHM_MAX_NUM_FUNCTIONS   256
+#define OHM_MAX_NUM_FUNCTIONS   1024
 
 typedef struct function_t function_t;
 struct function_t
@@ -129,7 +129,7 @@ void print_all_functions(void);
 
 /* Variables */
 
-#define OHM_MAX_NUM_VARS        256
+#define OHM_MAX_NUM_VARS        1024
 
 typedef struct variable_t variable_t;
 struct variable_t
