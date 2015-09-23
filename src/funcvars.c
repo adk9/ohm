@@ -348,7 +348,7 @@ add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die)
                 basetype_t *type = get_type_alias(var->type);
                 if (is_struct(type->ohm_type)) {
                     size = 0;
-                    for (i = 0; i < type->nelem; ++i) {
+                    for (i = 0; i < get_type_nelem(type); ++i) {
                         variable_t *newvar = &vars_table[vars_table_size];
                         sprintf(newvar->name, "%s.%s", var->name, type->elems[i]->name);
                         newvar->type = type->elems[i];
