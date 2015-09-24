@@ -20,7 +20,7 @@ probe_t     *probes_list;
 
 // allocate a new probe
 probe_t *
-new_probe(variable_t *var, bool active) {
+new_probe(char *name, variable_t *var, bool active, bool deref) {
     probe_t *p;
     if (!var)
         return NULL;
@@ -29,6 +29,9 @@ new_probe(variable_t *var, bool active) {
     if (!p)
         return NULL;
 
+    if (name != NULL) {
+        strncpy(p->name, name, strlen(name)+1);
+    }
     p->var = var;
     // we allocate a temporary buffer for the probe data here
     if (!var->type)
@@ -40,6 +43,7 @@ new_probe(variable_t *var, bool active) {
         return NULL;
     }
     p->status = active;
+    p->deref = deref;
     p->next = NULL;
     return p;
 }
@@ -75,11 +79,11 @@ print_probes(probe_t *probe)
     while (probe) {
         if (probe->var) {
             if (is_addr(probe->var->loctype))
-                ddebug("%s(0x%lx)\t[GLOBAL]", probe->var->name,
-                       probe->var->addr);
+                ddebug("%s(0x%lx)\t[GLOBAL] %s", probe->name,
+                       probe->var->addr, probe->deref ? "deref" : "");
             else
-                ddebug("%s(%ld)\t[STACK]", probe->var->name,
-                       probe->var->offset);
+                ddebug("%s(%ld)\t[STACK] %s", probe->name,
+                       probe->var->offset, probe->deref ? "deref" : "");
         }
         probe = probe->next;
     }

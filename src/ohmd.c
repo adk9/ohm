@@ -122,6 +122,7 @@ ohmread(char *path, probe_t **probes)
     variable_t *v;
     function_t *f;
     probe_t    *p;
+    bool        deref;
 
     np = 0;
     L = luaL_newstate();
@@ -149,18 +150,27 @@ ohmread(char *path, probe_t **probes)
         // name is at index -2 and probe struct at index -1
         probe = (char *) lua_tostring(L, -2);
         lua_pop(L, 1);
-        v = get_variable(probe);
+        char *pname = strchr(probe, '*');
+        if (pname != NULL) {
+            pname++;
+            deref = 1;
+        } else {
+            pname = probe;
+            deref = 0;
+        }
+
+        v = get_variable(pname);
         if (!v) {
             // if it is not a variable, check whether a function probe
             // is requested.
-            f = get_function(probe);
+            f = get_function(pname);
             if (!f) {
                 ddebug("Skipping non-existent probe %s.", probe);
                 continue;
             }
         }
 
-        p = new_probe(v, 1);
+        p = new_probe(probe, v, 1, deref);
         if (p && probes_list_add(&probes_list, p) < 0)
             continue;
         else
@@ -226,28 +236,40 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     if (ret < 0)
         return ret;
 
-    lua_pushstring(L, probe->var->name);
+    if (probe->deref) {
+        if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
+            addr = *(uintptr_t*)probe->buf;
+            ret = remote_copy(probe->buf, (void*)addr, t->elems[0]->size, arg);
+            if (ret < 0)
+                return ret;
+        }
+    }
+
+    lua_pushstring(L, probe->name);
     if (is_array(t->ohm_type) || is_struct(t->ohm_type))
         lua_newtable(L);
 
     int offset = 0;
-    for (i = 0; i < get_type_nelem(t); i++) {
-        if (is_array(t->ohm_type)) {
+    if (is_array(t->ohm_type)) {
+        for (i = 0; i < get_type_nelem(t); i++) {
             ot = get_type_alias(t->elems[0]);
             lua_pushnumber(L, i+1);
             lua_pushbuf(L, ot, probe->buf+offset);
             offset += get_type_size(ot);
-        } else if (is_struct(t->ohm_type)) {
+            lua_rawset(L, -3);
+        }
+    } else if (is_struct(t->ohm_type)) {
+        for (i = 1; i < get_type_nelem(t); i++) {
             ot = get_type_alias(t->elems[i]);
             lua_pushstring(L, t->elems[i]->name);
             lua_pushbuf(L, ot, probe->buf+offset);
             offset += t->elems[i]->size;
-        } else
-            lua_pushbuf(L, t, probe->buf+i);
-
-        if (is_array(t->ohm_type) || is_struct(t->ohm_type))
             lua_rawset(L, -3);
-    }
+        }
+    } else
+        for (i = 0; i < get_type_nelem(t); i++) {
+            lua_pushbuf(L, t, probe->buf+i);
+        }
 
     lua_rawset(L, -3);
     return ret;

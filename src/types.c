@@ -158,7 +158,7 @@ add_structmember_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
 
 error:
     derror("error in add_structmember_from_die()");
-    return -1;   
+    return -1;
 }
 
 
@@ -273,10 +273,10 @@ add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die)
             nsib = traverse_die(&add_structmember_from_die, dbg, parent_die, die);
             if (nsib < 0)
                 goto error;
-            t->nelem = nsib;
-            t->elems = malloc(nsib*sizeof(t));
-            for (i = 0; i < nsib; i++)
-                t->elems[i] = &types_table[types_table_size-nsib-1+i];
+            t->nelem = nsib-1;
+            t->elems = malloc((t->nelem)*sizeof(t));
+            for (i = 0; i < t->nelem; i++)
+                t->elems[i] = &types_table[types_table_size-t->nelem-1+i];
             break;
 
         case DW_TAG_typedef:
@@ -332,15 +332,16 @@ refresh_compound_sizes(void) {
     int c, sz, i, nmemb;
     basetype_t *t0, *t1;
     for (c = 0; c < types_table_size; c++) {
-        if(is_array(types_table[c].ohm_type)) {
+        if (is_array(types_table[c].ohm_type)) {
             sz = get_type_size(types_table[c].elems[0]);
             types_table[c].size = types_table[c].nelem * sz;
         } else if (is_struct(types_table[c].ohm_type)) {
             nmemb = types_table[c].nelem;
-            for (i = 0; i < nmemb-1; ++i) {
+            for (i = 1; i < nmemb-1; ++i) {
                 t0 = types_table[c].elems[i];
                 t1 = types_table[c].elems[i+1];
                 t0->size = t1->size - t0->size;
+
             }
             t0 = types_table[c].elems[nmemb-1];
             t0->size = types_table[c].size - t0->size;

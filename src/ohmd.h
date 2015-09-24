@@ -163,15 +163,17 @@ void print_all_variables(void);
 typedef struct probe_t probe_t;
 struct probe_t
 {
+    char        name[256];   // the name of the probe
     variable_t *var;         // the variable.
     char       *buf;         // this is a buffer we read data into.
     bool        status;      // status of the probe.
+    bool        deref;       // do we need to dereference?
     probe_t    *next;        // linked list of probes.
 };
 
 extern probe_t *probes_list;
 
-probe_t* new_probe(variable_t *var, bool active);
+probe_t* new_probe(char *name, variable_t *var, bool active, bool deref);
 
 int probes_list_add(probe_t **table, probe_t *probe);
 
