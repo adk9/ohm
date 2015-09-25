@@ -66,19 +66,12 @@ extern basetype_t   types_table[OHM_MAX_NUM_TYPES];
 extern unsigned int types_table_size;
 
 basetype_t* get_type(int id);
-
 basetype_t* get_or_add_type(int id);
-
 inline size_t get_type_size(basetype_t *type);
-
 inline unsigned int get_type_nelem(basetype_t *type);
-
 inline basetype_t* get_type_alias(basetype_t *type);
-
 inline int get_type_ohmtype(basetype_t *type);
-
 int add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
-
 int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
 
 /**********************************************************************/
@@ -101,13 +94,9 @@ extern unsigned int fns_table_size;
 extern function_t  *main_fn;
 
 function_t* get_function(char *name);
-
 void refresh_compound_sizes(void);
-
 inline int in_function(function_t *f, unsigned long ip);
-
 inline int in_main(unsigned long ip);
-
 void print_all_functions(void);
 
 /**********************************************************************/
@@ -148,12 +137,9 @@ extern variable_t   vars_table[OHM_MAX_NUM_VARS];
 extern unsigned int vars_table_size;
 
 variable_t* get_variable(char *name);
-
 int add_var_location(variable_t *var, Dwarf_Debug dbg, Dwarf_Die die,
                      Dwarf_Attribute attr, Dwarf_Half form);
-
 int add_var_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die child_die);
-
 void print_all_variables(void);
 
 /**********************************************************************/
@@ -161,9 +147,9 @@ void print_all_variables(void);
 /* Probes */
 
 // The type of the probe.
-#define    OHM_DEREF  (1<<0) // dereference, e.g. *x
-#define OHM_PTR_ADDR  (1<<1) // address of a pointer, e.g. &x
-#define  OHM_ARR_IND  (1<<2) // array index, e.g. x[5]
+#define    OHM_DEREF  (1<<1) // dereference, e.g. *x
+#define OHM_PTR_ADDR  (1<<2) // address of a pointer, e.g. &x
+#define  OHM_ARR_IND  (1<<3) // array index, e.g. x[5]
 
 #define    is_deref(v) ((v) & OHM_DEREF)
 #define is_ptr_addr(v) ((v) & OHM_PTR_ADDR)
@@ -182,11 +168,11 @@ struct probe_t
 
 extern probe_t *probes_list;
 
-probe_t* new_probe(char *name, variable_t *var, bool active, bool deref);
-
+probe_t* new_probe(char *name);
 int probes_list_add(probe_t **table, probe_t *probe);
-
 void print_probes(probe_t *probe);
+int probe_initialize(void);
+void probe_finalize(void);
 
 /**********************************************************************/
 

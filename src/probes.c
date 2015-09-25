@@ -12,22 +12,49 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <regex.h>
 
 #include "ohmd.h"
 
 // List of "active" probes
 probe_t     *probes_list;
 
-// allocate a new probe
-probe_t *
-new_probe(char *name, variable_t *var, bool active, bool deref) {
+// Regular expressions to parse probe array index descriptions
+static regex_t probe_re_arrind;
+
+// initialize the probe infrastructure
+int probe_initialize(void) {
+    int ret = regcomp(&probe_re_arrind, "([[:alnum:]]+)\\[([[:digit:]]+)\\]", REG_EXTENDED);
+    if (ret) {
+        derror("failed to compile probe_re_arrind regex.");
+        return -1;
+    }
+    return 1;
+}
+
+// finalize the probe infrastructure
+void probe_finalize(void) {
+    regfree(&probe_re_arrind);    
+}
+
+// create a probe given the following arguments:
+//
+// name: probe name
+// var: the variable corresponding to the probe
+// active: if the probe is active or not
+// type: the type of the probe
+// start: if the probe is an array index, the starting element
+// num: if the probe is an array index, the number of elements to probe
+probe_t *_create_probe(char *name, variable_t *var, bool active, int type,
+                       int start, int num) {
     probe_t *p;
     if (!var)
         return NULL;
 
     p = calloc(1, sizeof(*p));
     if (!p) {
-        ddebug("unable to allocate memory. skipping probe %s...", name);
+        ddebug("unable to allocate memory. Skipping probe %s...", name);
         return NULL;
     }
 
@@ -37,21 +64,85 @@ new_probe(char *name, variable_t *var, bool active, bool deref) {
     p->var = var;
     // we allocate a temporary buffer for the probe data here
     if (!var->type) {
-        ddebug("invalid type. skipping probe %s...", name);
+        ddebug("invalid type. Skipping probe %s...", name);
         return NULL;
     }
 
     p->buf = calloc(get_type_size(var->type), 1);
     if (!p->buf) {
-        ddebug("could not figure out the type size. skipping probe %s...", name);
+        ddebug("could not figure out the type size. Skipping probe %s...", name);
         free(p);
         return NULL;
     }
     p->status = active;
-    if (deref)
-        p->type = OHM_DEREF;
+    if (type < 0 || type > OHM_ARR_IND) {
+        ddebug("invalid probe type. Skipping probe %s...", name);
+        free(p);
+        return NULL;
+    }
+    p->type = type;
     p->next = NULL;
-    return p;
+    return p;    
+}
+
+/// Given the name of the probe, @p name, this function determines
+/// the type of the probe it is and returns: the name of the variable
+/// that we should be attaching to, and the type of the probe and
+/// optionally the start and the number of array elements to probe.
+static int _get_probe_type(char *name, char **pvar, int *type,
+                           int *start, int *num) {
+    char *pname = strchr(name, '*');
+    if (pname != NULL) {
+        *type = OHM_DEREF;
+        *pvar = strdup(pname+1);
+        return 1;
+    }
+
+    pname = strchr(name, '&');
+    if (pname != NULL) {
+        *type = OHM_PTR_ADDR;
+        *pvar = strdup(pname+1);
+        return 1;
+    }
+
+    regmatch_t matches[3];
+    int ret = regexec(&probe_re_arrind, name, 3, matches, 0);
+    if (!ret) {
+        *type = OHM_ARR_IND;
+        *(name+matches[1].rm_eo) = '\0';
+        *pvar = strdup(name+matches[1].rm_so);
+        *(name+matches[2].rm_eo) = '\0';
+        *start = atoi(name+matches[2].rm_so);
+        return 1;
+    }
+
+    *pvar = strdup(name);
+    return 1;
+}
+
+// allocate a new probe
+probe_t *
+new_probe(char *name) {
+    int type = 0;
+    int start = 0;
+    int num = 0;
+    char *pname;
+
+    _get_probe_type(name, &pname, &type, &start, &num);
+    
+    variable_t *v = get_variable(pname);
+    if (!v) {
+        // if it is not a variable, check whether a function probe
+        // is requested.
+        function_t *f = get_function(pname);
+        if (!f) {
+            ddebug("Skipping non-existent probe %s.", pname);
+            return NULL;
+        }
+    }
+    free(pname);
+
+    return _create_probe(name, v, 1, type, start, num);
 }
 
 // add a probe to the probes table

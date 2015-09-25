@@ -50,6 +50,7 @@ int           ohm_debug;
 // Global Lua state
 static lua_State *L;
 
+
 // Global unwind state
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
@@ -118,13 +119,12 @@ static int
 ohmread(char *path, probe_t **probes)
 {
     int         np;
-    char       *probe;
-    variable_t *v;
-    function_t *f;
+    char       *probe_name;
+
     probe_t    *p;
-    bool        deref;
 
     np = 0;
+    probe_initialize();
     L = luaL_newstate();
 
     luaL_openlibs(L);
@@ -148,29 +148,10 @@ ohmread(char *path, probe_t **probes)
     lua_pushnil(L);  // first key
     while (lua_next(L, -2) != 0) {
         // name is at index -2 and probe struct at index -1
-        probe = (char *) lua_tostring(L, -2);
+        probe_name = (char *) lua_tostring(L, -2);
         lua_pop(L, 1);
-        char *pname = strchr(probe, '*');
-        if (pname != NULL) {
-            pname++;
-            deref = 1;
-        } else {
-            pname = probe;
-            deref = 0;
-        }
 
-        v = get_variable(pname);
-        if (!v) {
-            // if it is not a variable, check whether a function probe
-            // is requested.
-            f = get_function(pname);
-            if (!f) {
-                ddebug("Skipping non-existent probe %s.", probe);
-                continue;
-            }
-        }
-
-        p = new_probe(probe, v, 1, deref);
+        p = new_probe(probe_name);
         if (p && probes_list_add(&probes_list, p) < 0)
             continue;
         else
@@ -499,6 +480,7 @@ int main(int argc, char *argv[])
 #if HAVE_XPMEM
     xpmem_detach_mem();
 #endif
+    probe_finalize();
     return 0;
 
 error:
