@@ -212,6 +212,11 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     if (!probe || !probe->var)
         return -1;
 
+    if (is_ptr_addr(probe->type)) {
+        memcpy(probe->buf, &addr, sizeof(addr));
+        return 1;
+    }
+
     t = get_type_alias(probe->var->type);
     ret = remote_copy(probe->buf, (void*)addr, get_type_size(t), arg);
     if (ret < 0)
