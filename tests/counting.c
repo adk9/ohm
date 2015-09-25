@@ -11,15 +11,13 @@ struct counter_t {
 };
 
 static counter_t ctr;
-char *foo;
+int foo[] = {1, 2, 3, 4};
 
 int main(int argc, char* argv[])
 {
     ctr.limit = 120;
     ctr.pcount = malloc(sizeof(int));
     *ctr.pcount = 0;
-    foo = malloc(1);
-    *foo = 's';
     if (argc > 1)
         ctr.limit = atoi(argv[1]);
 

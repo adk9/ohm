@@ -259,7 +259,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
             lua_rawset(L, -3);
         }
     } else if (is_struct(t->ohm_type)) {
-        for (i = 1; i < get_type_nelem(t); i++) {
+        for (i = 0; i < get_type_nelem(t); i++) {
             ot = get_type_alias(t->elems[i]);
             lua_pushstring(L, t->elems[i]->name);
             lua_pushbuf(L, ot, probe->buf+offset);

@@ -26,19 +26,24 @@ new_probe(char *name, variable_t *var, bool active, bool deref) {
         return NULL;
 
     p = malloc(sizeof(*p));
-    if (!p)
+    if (!p) {
+        ddebug("unable to allocate memory. skipping probe %s...", name);
         return NULL;
+    }
 
     if (name != NULL) {
         strncpy(p->name, name, strlen(name)+1);
     }
     p->var = var;
     // we allocate a temporary buffer for the probe data here
-    if (!var->type)
+    if (!var->type) {
+        ddebug("invalid type. skipping probe %s...", name);
         return NULL;
+    }
 
     p->buf = calloc(get_type_size(var->type), 1);
     if (!p->buf) {
+        ddebug("could not figure out the type size. skipping probe %s...", name);
         free(p);
         return NULL;
     }
