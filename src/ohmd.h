@@ -122,10 +122,10 @@ void print_all_functions(void);
 
 // Convenience macros to determine the location type
 // of the variable.
-#define    is_addr(v) ((v) & (1<<0))
-#define   is_fbreg(v) ((v) & (1<<1))
-#define     is_reg(v) ((v) & (1<<2))
-#define is_literal(v) ((v) & (1<<3))
+#define    is_addr(v) ((v) & OHM_ADDRESS)
+#define   is_fbreg(v) ((v) & OHM_FBREG)
+#define     is_reg(v) ((v) & OHM_REG)
+#define is_literal(v) ((v) & OHM_LITERAL)
 
 /* Variables */
 
@@ -160,6 +160,15 @@ void print_all_variables(void);
 
 /* Probes */
 
+// The type of the probe.
+#define    OHM_DEREF  (1<<0) // dereference, e.g. *x
+#define OHM_PTR_ADDR  (1<<1) // address of a pointer, e.g. &x
+#define  OHM_ARR_IND  (1<<2) // array index, e.g. x[5]
+
+#define    is_deref(v) ((v) & OHM_DEREF)
+#define is_ptr_addr(v) ((v) & OHM_PTR_ADDR)
+#define  is_arr_ind(v) ((v) & OHM_ARR_IND)
+
 typedef struct probe_t probe_t;
 struct probe_t
 {
@@ -167,7 +176,7 @@ struct probe_t
     variable_t *var;         // the variable.
     char       *buf;         // this is a buffer we read data into.
     bool        status;      // status of the probe.
-    bool        deref;       // do we need to dereference?
+    int         type;        // type of the probe
     probe_t    *next;        // linked list of probes.
 };
 

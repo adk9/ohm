@@ -25,7 +25,7 @@ new_probe(char *name, variable_t *var, bool active, bool deref) {
     if (!var)
         return NULL;
 
-    p = malloc(sizeof(*p));
+    p = calloc(1, sizeof(*p));
     if (!p) {
         ddebug("unable to allocate memory. skipping probe %s...", name);
         return NULL;
@@ -48,7 +48,8 @@ new_probe(char *name, variable_t *var, bool active, bool deref) {
         return NULL;
     }
     p->status = active;
-    p->deref = deref;
+    if (deref)
+        p->type = OHM_DEREF;
     p->next = NULL;
     return p;
 }
@@ -84,11 +85,11 @@ print_probes(probe_t *probe)
     while (probe) {
         if (probe->var) {
             if (is_addr(probe->var->loctype))
-                ddebug("%s(0x%lx)\t[GLOBAL] %s", probe->name,
-                       probe->var->addr, probe->deref ? "deref" : "");
+                ddebug("%s(0x%lx)\t[GLOBAL]", probe->name,
+                       probe->var->addr);
             else
-                ddebug("%s(%ld)\t[STACK] %s", probe->name,
-                       probe->var->offset, probe->deref ? "deref" : "");
+                ddebug("%s(%ld)\t[STACK]", probe->name,
+                       probe->var->offset);
         }
         probe = probe->next;
     }

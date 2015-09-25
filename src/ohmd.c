@@ -236,7 +236,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     if (ret < 0)
         return ret;
 
-    if (probe->deref) {
+    if (is_deref(probe->type)) {
         if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
             addr = *(uintptr_t*)probe->buf;
             ret = remote_copy(probe->buf, (void*)addr, t->elems[0]->size, arg);
