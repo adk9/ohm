@@ -163,6 +163,8 @@ struct probe_t
     char       *buf;         // this is a buffer we read data into.
     bool        status;      // status of the probe.
     int         type;        // type of the probe
+    int         start;       // start index for array probes
+    int         num;         // number of elements for array probes
     probe_t    *next;        // linked list of probes.
 };
 

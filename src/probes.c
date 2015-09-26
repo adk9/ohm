@@ -81,8 +81,10 @@ probe_t *_create_probe(char *name, variable_t *var, bool active, int type,
         return NULL;
     }
     p->type = type;
+    p->start = start;
+    p->num = num;
     p->next = NULL;
-    return p;    
+    return p;
 }
 
 /// Given the name of the probe, @p name, this function determines
@@ -125,10 +127,11 @@ probe_t *
 new_probe(char *name) {
     int type = 0;
     int start = 0;
-    int num = 0;
+    int num = 1;
     char *pname;
+    char *name_ = strdup(name);
 
-    _get_probe_type(name, &pname, &type, &start, &num);
+    _get_probe_type(name_, &pname, &type, &start, &num);
     
     variable_t *v = get_variable(pname);
     if (!v) {
@@ -141,6 +144,7 @@ new_probe(char *name) {
         }
     }
     free(pname);
+    free(name_);
 
     return _create_probe(name, v, 1, type, start, num);
 }

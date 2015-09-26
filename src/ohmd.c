@@ -206,43 +206,72 @@ remote_copy(void *dst, void *src, size_t size, void *arg)
 static int
 write_lua(probe_t *probe, addr_t addr, void *arg)
 {
-    int ret, i;
+    int ret, i, j;
     basetype_t *t, *ot;
+    size_t elem_size;
 
     if (!probe || !probe->var)
         return -1;
 
     if (is_ptr_addr(probe->type)) {
         memcpy(probe->buf, &addr, sizeof(addr));
-        return 1;
-    }
+    } else {
+        t = get_type_alias(probe->var->type);
+        int size = get_type_size(t);
+        if (is_array(t->ohm_type)) {
+            ot = get_type_alias(t->elems[0]);
+            elem_size = get_type_size(ot);
 
-    t = get_type_alias(probe->var->type);
-    ret = remote_copy(probe->buf, (void*)addr, get_type_size(t), arg);
-    if (ret < 0)
-        return ret;
+            if (is_arr_ind(probe->type)) {
+                if (size < ((probe->start+probe->num) * elem_size)) {
+                    ddebug("Skipping probe %s: array index out of bounds",
+                           probe->name);
+                } else {
+                    addr = (addr_t)((char*)addr+(probe->start * elem_size));
+                    size = probe->num * elem_size;
+                }
+            }
+        }
+        ret = remote_copy(probe->buf, (void*)addr, size, arg);
+        if (ret < 0)
+            return ret;
 
-    if (is_deref(probe->type)) {
-        if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
-            addr = *(uintptr_t*)probe->buf;
-            ret = remote_copy(probe->buf, (void*)addr, t->elems[0]->size, arg);
-            if (ret < 0)
-                return ret;
+        if (is_deref(probe->type)) {
+            if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
+                addr = *(uintptr_t*)probe->buf;
+                ret = remote_copy(probe->buf, (void*)addr, t->elems[0]->size, arg);
+                if (ret < 0)
+                    return ret;
+            }
         }
     }
 
     lua_pushstring(L, probe->name);
-    if (is_array(t->ohm_type) || is_struct(t->ohm_type))
+    if ((is_array(t->ohm_type) && (probe->num > 1))
+        || is_struct(t->ohm_type))
         lua_newtable(L);
 
-    int offset = 0;
+    size_t offset = 0;
+    int start, nelem;
     if (is_array(t->ohm_type)) {
-        for (i = 0; i < get_type_nelem(t); i++) {
-            ot = get_type_alias(t->elems[0]);
-            lua_pushnumber(L, i+1);
+        if (is_arr_ind(probe->type)) {
+            start = probe->start;
+            nelem = probe->num;
+        } else {
+            start = 0;
+            nelem = get_type_nelem(t);
+        }
+
+        for (i = start, j = 1; i < start+nelem; i++, j++) {
+            if (probe->num > 1) {
+                lua_pushnumber(L, j);
+            }
             lua_pushbuf(L, ot, probe->buf+offset);
-            offset += get_type_size(ot);
-            lua_rawset(L, -3);
+            offset += elem_size;
+
+            if (probe->num > 1) {
+                lua_rawset(L, -3);
+            }
         }
     } else if (is_struct(t->ohm_type)) {
         for (i = 0; i < get_type_nelem(t); i++) {

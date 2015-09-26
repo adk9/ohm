@@ -1,6 +1,6 @@
 CTR  = probe {"ctr", 1.0}
 COUNT  = probe {"*ctr.pcount", 1.0}
-FOO  = probe {"foo[2]", 1.0}
+FOO  = probe {"foo[1]", 1.0}
 
 rule{CTR} { function () print("OHM count = " .. CTR[1]["count"] .. " limit = " .. CTR[1]["limit"] .. " pcount = " .. CTR[1]["pcount"]) end }
 rule{COUNT} { function () print("*pcount = " .. COUNT[1]) end }
