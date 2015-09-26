@@ -208,6 +208,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
 {
     int ret, i, j;
     basetype_t *t, *ot;
+    int nelem;
     size_t elem_size;
 
     if (!probe || !probe->var)
@@ -221,14 +222,16 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
         if (is_array(t->ohm_type)) {
             ot = get_type_alias(t->elems[0]);
             elem_size = get_type_size(ot);
+            nelem = (probe->num < 0) ? (get_type_nelem(t)-probe->start) : probe->num+1;
 
             if (is_arr_ind(probe->type)) {
-                if (size < ((probe->start+probe->num) * elem_size)) {
-                    ddebug("Skipping probe %s: array index out of bounds",
+                if (size < ((probe->start+nelem) * elem_size)) {
+                    ddebug("skipping probe %s: array index out of bounds",
                            probe->name);
+                    return 1;
                 } else {
                     addr = (addr_t)((char*)addr+(probe->start * elem_size));
-                    size = probe->num * elem_size;
+                    size = nelem * elem_size;
                 }
             }
         }
@@ -247,29 +250,27 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     }
 
     lua_pushstring(L, probe->name);
-    if ((is_array(t->ohm_type) && (probe->num > 1))
+    if ((is_array(t->ohm_type) && (nelem > 1))
         || is_struct(t->ohm_type))
         lua_newtable(L);
 
     size_t offset = 0;
-    int start, nelem;
+    int start;
     if (is_array(t->ohm_type)) {
         if (is_arr_ind(probe->type)) {
             start = probe->start;
-            nelem = probe->num;
         } else {
             start = 0;
-            nelem = get_type_nelem(t);
         }
 
         for (i = start, j = 1; i < start+nelem; i++, j++) {
-            if (probe->num > 1) {
+            if (nelem > 1) {
                 lua_pushnumber(L, j);
             }
             lua_pushbuf(L, ot, probe->buf+offset);
             offset += elem_size;
 
-            if (probe->num > 1) {
+            if (nelem > 1) {
                 lua_rawset(L, -3);
             }
         }

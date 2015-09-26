@@ -25,7 +25,7 @@ static regex_t probe_re_arrind;
 
 // initialize the probe infrastructure
 int probe_initialize(void) {
-    int ret = regcomp(&probe_re_arrind, "([[:alnum:]]+)\\[([[:digit:]]+)\\]", REG_EXTENDED);
+    int ret = regcomp(&probe_re_arrind, "([[:alnum:]]+)\\[([[:digit:]]*):?([[:digit:]]*)\\]", REG_EXTENDED);
     if (ret) {
         derror("failed to compile probe_re_arrind regex.");
         return -1;
@@ -107,14 +107,28 @@ static int _get_probe_type(char *name, char **pvar, int *type,
         return 1;
     }
 
-    regmatch_t matches[3];
-    int ret = regexec(&probe_re_arrind, name, 3, matches, 0);
+    regmatch_t matches[4];
+    int ret = regexec(&probe_re_arrind, name, 4, matches, 0);
     if (!ret) {
         *type = OHM_ARR_IND;
         *(name+matches[1].rm_eo) = '\0';
         *pvar = strdup(name+matches[1].rm_so);
-        *(name+matches[2].rm_eo) = '\0';
-        *start = atoi(name+matches[2].rm_so);
+
+        if (matches[2].rm_so != matches[2].rm_eo) {
+            *(name+matches[2].rm_eo) = '\0';
+            *start = atoi(name+matches[2].rm_so);
+        } else {
+            *start = 0;
+        }
+
+        if (matches[3].rm_so != matches[3].rm_eo) {
+            *(name+matches[3].rm_eo) = '\0';
+            *num = atoi(name+matches[3].rm_so)-(*start);
+        } else {
+            if (matches[3].rm_so != matches[2].rm_eo+1) {
+                *num = 0;
+            }
+        }
         return 1;
     }
 
@@ -127,12 +141,11 @@ probe_t *
 new_probe(char *name) {
     int type = 0;
     int start = 0;
-    int num = 1;
+    int num = -1;
     char *pname;
     char *name_ = strdup(name);
 
     _get_probe_type(name_, &pname, &type, &start, &num);
-    
     variable_t *v = get_variable(pname);
     if (!v) {
         // if it is not a variable, check whether a function probe
