@@ -336,6 +336,8 @@ refresh_compound_sizes(void) {
             types_table[c].size = types_table[c].nelem * sz;
         } else if (is_struct(types_table[c].ohm_type)) {
             nmemb = types_table[c].nelem;
+            if (!nmemb)
+                continue;
             for (i = 0; i < nmemb-1; ++i) {
                 t0 = types_table[c].elems[i];
                 t1 = types_table[c].elems[i+1];
