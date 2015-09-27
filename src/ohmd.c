@@ -32,6 +32,10 @@
 #include <sys/uio.h>
 #endif
 
+#if HAVE_MPI
+#include "mpi.h"
+#endif
+
 #include "ohmd.h"
 
 #if (!defined(PTRACE_PEEKUSER) && defined(PTRACE_PEEKUSR))
@@ -243,6 +247,13 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
             if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
                 addr = *(uintptr_t*)probe->buf;
                 ret = remote_copy(probe->buf, (void*)addr, t->elems[0]->size, arg);
+                if (ret < 0)
+                    return ret;
+            }
+        } else if (is_struct_mem(probe->type)) {
+            if ((t->ohm_type == OHM_TYPE_PTR) && (t->elems[0])) {
+                addr = *(uintptr_t*)probe->buf + probe->start;
+                ret = remote_copy(probe->buf, (void*)addr, probe->num, arg);
                 if (ret < 0)
                     return ret;
             }
