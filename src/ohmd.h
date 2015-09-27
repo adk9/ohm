@@ -50,6 +50,7 @@ typedef unsigned long addr_t;
 #define is_struct(v)   ((v) & OHM_TYPE_STRUCT)
 #define is_unsigned(v) ((v) & OHM_TYPE_UNSIGNED)
 #define is_scalar(v)   ((v) >= OHM_TYPE_INT)
+#define is_ptr(v)      ((v) & OHM_TYPE_PTR)
 
 typedef struct basetype_t basetype_t;
 struct basetype_t
@@ -70,6 +71,7 @@ basetype_t* get_or_add_type(int id);
 inline size_t get_type_size(basetype_t *type);
 inline unsigned int get_type_nelem(basetype_t *type);
 inline basetype_t* get_type_alias(basetype_t *type);
+inline basetype_t* get_type_ptr(basetype_t *type);
 inline int get_type_ohmtype(basetype_t *type);
 int add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
 int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
@@ -147,13 +149,15 @@ void print_all_variables(void);
 /* Probes */
 
 // The type of the probe.
-#define    OHM_DEREF  (1<<1) // dereference, e.g. *x
-#define OHM_PTR_ADDR  (1<<2) // address of a pointer, e.g. &x
-#define  OHM_ARR_IND  (1<<3) // array index, e.g. x[5]
+#define    OHM_DEREF   (1<<1) // dereference, e.g. *x
+#define OHM_PTR_ADDR   (1<<2) // address of a pointer, e.g. &x
+#define  OHM_ARR_IND   (1<<3) // array index, e.g. x[5]
+#define OHM_STRUCT_MEM (1<<4) // member of a struct ptr, e.g. x->y
 
-#define    is_deref(v) ((v) & OHM_DEREF)
-#define is_ptr_addr(v) ((v) & OHM_PTR_ADDR)
-#define  is_arr_ind(v) ((v) & OHM_ARR_IND)
+#define    is_deref(v)    ((v) & OHM_DEREF)
+#define is_ptr_addr(v)    ((v) & OHM_PTR_ADDR)
+#define  is_arr_ind(v)    ((v) & OHM_ARR_IND)
+#define  is_struct_mem(v) ((v) & OHM_STRUCT_MEM)
 
 typedef struct probe_t probe_t;
 struct probe_t

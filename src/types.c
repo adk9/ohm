@@ -77,6 +77,15 @@ get_type_alias(basetype_t *type)
     return type;
 }
 
+inline basetype_t*
+get_type_ptr(basetype_t *type)
+{
+    if ((is_ptr(type->ohm_type) || is_alias(type->ohm_type))
+        && type->elems)
+        return get_type_ptr(type->elems[0]);
+    return type;
+}
+
 inline int
 get_type_ohmtype(basetype_t *type)
 {
