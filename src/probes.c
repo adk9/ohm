@@ -22,6 +22,7 @@ probe_t     *probes_list;
 
 // Regular expressions to parse probe array index descriptions
 static regex_t probe_re_arrind;
+static regex_t probe_re_structmem;
 
 // initialize the probe infrastructure
 int probe_initialize(void) {
@@ -30,12 +31,19 @@ int probe_initialize(void) {
         derror("failed to compile probe_re_arrind regex.");
         return -1;
     }
+
+    ret = regcomp(&probe_re_structmem, "([[:alnum:]]+)->([[:alnum:]]+)", REG_EXTENDED);
+    if (ret) {
+        derror("failed to compile probe_re_structmem regex.");
+        return -1;
+    }
     return 1;
 }
 
 // finalize the probe infrastructure
 void probe_finalize(void) {
-    regfree(&probe_re_arrind);    
+    regfree(&probe_re_arrind);
+    regfree(&probe_re_structmem);
 }
 
 // create a probe given the following arguments:
