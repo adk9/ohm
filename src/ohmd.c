@@ -302,6 +302,41 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     return ret;
 }
 
+static addr_t
+_get_probe_var_addr(variable_t *var) {
+    addr_t addr = 0;
+    switch (var->loctype) {
+        case OHM_ADDRESS:
+            addr = var->addr;
+            break;
+
+        default:
+            // copy the cursor so we can move back
+            cur = unw_cursor;
+            do {
+                // unwind the stack to read as many probes as possible
+                unw_get_reg(&cur, UNW_REG_IP, &ip);
+                if (in_function(var->function, ip)) {
+                    // Get the probe location
+                    if (is_fbreg(var->loctype)) {
+                        unw_get_reg(&cur, UNW_X86_64_RBP, &ptr);
+                        ptr = ptr+16+var->offset;
+                    } else if (is_reg(var->loctype)) {
+                        unw_get_reg(&cur, var->offset, &ptr);
+                    } else if (is_literal(var->loctype)) {
+                        ptr = var->offset;
+                    } else
+                        derror("don't know how to read probe, skipping...");
+                    // copy it to the Lua Land.
+                    addr = ptr;
+                }
+            } while (!in_main(ip) && (unw_step(&cur) > 0));
+            break;
+    }
+    return addr;
+}
+
+
 static void
 probe(void *arg)
 {
@@ -317,36 +352,9 @@ probe(void *arg)
 
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
-        switch (p->var->loctype) {
-            case OHM_ADDRESS:
-                if (write_lua(p, p->var->addr, arg) < 0) 
-                    derror("error in probe, skipping...");
-                break;
-
-            default:
-                // copy the cursor so we can move back
-                cur = unw_cursor;
-                do {
-                    // unwind the stack to read as many probes as possible
-                    unw_get_reg(&cur, UNW_REG_IP, &ip);
-                    if (in_function(p->var->function, ip)) {
-                        // Get the probe location
-                        if (is_fbreg(p->var->loctype)) {
-                            unw_get_reg(&cur, UNW_X86_64_RBP, &ptr);
-                            ptr = ptr+16+p->var->offset;
-                        } else if (is_reg(p->var->loctype)) {
-                            unw_get_reg(&cur, p->var->offset, &ptr);
-                        } else if (is_literal(p->var->loctype)) {
-                            ptr = p->var->offset;
-                        } else
-                            derror("don't know how to read probe, skipping...");
-                        // copy it to the Lua Land.
-                        if (write_lua(p, ptr, arg) < 0)
-                            derror("error in accessing probe, skipping...");
-                    }
-                } while (!in_main(ip) && (unw_step(&cur) > 0));
-                break;
-        }
+        addr = _get_probe_var_addr(p->var);
+        if (write_lua(p, addr, arg) < 0)
+            derror("error in probe, skipping...");
     }
 
     if (lua_pcall(L, 1, 0, 0) != 0) {
