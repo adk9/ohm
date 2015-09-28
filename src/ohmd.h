@@ -169,6 +169,8 @@ struct probe_t
     int         type;        // type of the probe
     int         start;       // start index for array probes
     int         num;         // number of elements for array probes
+    variable_t *lower;       // lower dynamic array index
+    variable_t *upper;       // upper dynamic array index
     probe_t    *next;        // linked list of probes.
 };
 

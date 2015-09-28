@@ -59,6 +59,8 @@ static lua_State *L;
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
 
+// Forward declaration
+static addr_t _get_probe_var_addr(variable_t *var);
 
 // scan for all types or variables and  function in a given file
 // "file". The debug information defined by the DWARF format is used
@@ -214,6 +216,7 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     basetype_t *t, *ot;
     int nelem;
     size_t elem_size;
+    addr_t iaddr;
 
     if (!probe || !probe->var)
         return -1;
@@ -222,13 +225,32 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
         memcpy(probe->buf, &addr, sizeof(addr));
     } else {
         t = get_type_alias(probe->var->type);
-        int size = get_type_size(t);
+        size_t size = get_type_size(t);
         if (is_array(t->ohm_type)) {
             ot = get_type_alias(t->elems[0]);
             elem_size = get_type_size(ot);
             nelem = (probe->num < 0) ? (get_type_nelem(t)-probe->start) : probe->num+1;
 
             if (is_arr_ind(probe->type)) {
+                if (probe->lower) {
+                    iaddr = _get_probe_var_addr(probe->lower);
+                    int start;
+                    ret = remote_copy(&start, (void*)iaddr, sizeof(start), arg);
+                    probe->start = start;
+                    if (ret < 0)
+                        return ret;
+                }
+
+                if (probe->upper) {
+                    iaddr = _get_probe_var_addr(probe->upper);
+                    int num;
+                    ret = remote_copy(&num, (void*)iaddr, sizeof(num), arg);
+                    probe->num = num;
+                    if (ret < 0)
+                        return ret;
+                }
+
+                nelem = (probe->num < 0) ? (get_type_nelem(t)-probe->start) : probe->num+1;
                 if (size < ((probe->start+nelem) * elem_size)) {
                     ddebug("skipping probe %s: array index out of bounds",
                            probe->name);
@@ -304,7 +326,10 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
 
 static addr_t
 _get_probe_var_addr(variable_t *var) {
+    unw_word_t ip, ptr;
+    unw_cursor_t cur;
     addr_t addr = 0;
+
     switch (var->loctype) {
         case OHM_ADDRESS:
             addr = var->addr;
@@ -341,8 +366,6 @@ static void
 probe(void *arg)
 {
     probe_t *p;
-    unw_word_t ip, ptr;
-    unw_cursor_t cur;
 
     lua_getglobal(L, "ohm_add");
     if(!lua_isfunction(L, -1)) {
@@ -352,7 +375,7 @@ probe(void *arg)
 
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
-        addr = _get_probe_var_addr(p->var);
+        addr_t addr = _get_probe_var_addr(p->var);
         if (write_lua(p, addr, arg) < 0)
             derror("error in probe, skipping...");
     }

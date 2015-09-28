@@ -11,6 +11,7 @@ struct counter_t {
 };
 
 static counter_t *ctr;
+static int index = 2;
 int foo[] = {1, 2, 3, 4};
 
 int main(int argc, char* argv[])

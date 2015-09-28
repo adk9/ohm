@@ -7,6 +7,7 @@
 #include "config.h"
 #endif
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -24,9 +25,21 @@ probe_t     *probes_list;
 static regex_t probe_re_arrind;
 static regex_t probe_re_structmem;
 
+static inline bool
+_str_is_alnum(char *s) {
+    while(isalnum(*s)) ++s;
+    return (*s == 0);
+}
+
+static inline bool
+_str_is_digit(char *s) {
+    while(isdigit(*s)) ++s;
+    return (*s == 0);
+}
+
 // initialize the probe infrastructure
 int probe_initialize(void) {
-    int ret = regcomp(&probe_re_arrind, "([[:alnum:]]+)\\[([[:digit:]]*):?([[:digit:]]*)\\]", REG_EXTENDED);
+    int ret = regcomp(&probe_re_arrind, "([[:alnum:]]+)\\[([[:alnum:]]*):?([[:alnum:]]*)\\]", REG_EXTENDED);
     if (ret) {
         derror("failed to compile probe_re_arrind regex.");
         return -1;
@@ -55,6 +68,8 @@ static int _set_probe_type(probe_t *p, char *name, char **pvar, char **ref) {
     p->type = 0;
     p->start = 0;
     p->num = -1;
+    p->lower = NULL;
+    p->upper = NULL;
 
     char *pname = strchr(name, '*');
     if (pname != NULL) {
@@ -74,19 +89,33 @@ static int _set_probe_type(probe_t *p, char *name, char **pvar, char **ref) {
     int ret = regexec(&probe_re_arrind, name, 4, matches, 0);
     if (!ret) {
         p->type = OHM_ARR_IND;
-        *(name+matches[1].rm_eo) = '\0';
+        *(name+matches[1].rm_eo) = 0;
         *pvar = strdup(name+matches[1].rm_so);
 
+        // if a lower index is specified...
         if (matches[2].rm_so != matches[2].rm_eo) {
-            *(name+matches[2].rm_eo) = '\0';
-            p->start = atoi(name+matches[2].rm_so);
+            *(name+matches[2].rm_eo) = 0;
+            if (_str_is_digit(name+matches[2].rm_so)) {
+                p->start = atoi(name+matches[2].rm_so);
+                p->lower = NULL;
+            } else {
+                p->lower = get_variable(name+matches[2].rm_so);
+                p->start = 0;
+            }
         } else {
             p->start = 0;
+            p->lower = NULL;
         }
 
         if (matches[3].rm_so != matches[3].rm_eo) {
-            *(name+matches[3].rm_eo) = '\0';
-            p->num = atoi(name+matches[3].rm_so)-(p->start);
+            *(name+matches[3].rm_eo) = 0;
+            if (_str_is_digit(name+matches[3].rm_so)) {
+                p->num = atoi(name+matches[3].rm_so)-(p->start);
+                p->upper = NULL;
+            } else {
+                p->upper = get_variable(name+matches[3].rm_so);
+                p->num = 0;
+            }
         } else {
             if (matches[3].rm_so != matches[2].rm_eo+1) {
                 p->num = 0;
@@ -98,10 +127,10 @@ static int _set_probe_type(probe_t *p, char *name, char **pvar, char **ref) {
     ret = regexec(&probe_re_structmem, name, 3, matches, 0);
     if (!ret) {
         p->type = OHM_STRUCT_MEM;
-        *(name+matches[1].rm_eo) = '\0';
+        *(name+matches[1].rm_eo) = 0;
         *pvar = strdup(name+matches[1].rm_so);
 
-        *(name+matches[2].rm_eo) = '\0';
+        *(name+matches[2].rm_eo) = 0;
         *ref = strdup(name+matches[2].rm_so);
         return 1;
     }
