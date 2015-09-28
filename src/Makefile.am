@@ -9,7 +9,12 @@ endif
 AM_CPPFLAGS    = $(XPMEM_CFLAGS) -D_POSIX_C_SOURCE=200809L -I/usr/include -I$(top_srcdir)/include
 AM_LDFLAGS     = -static
 ohmd_CFLAGS    = -Wno-error=format $(OHM_PEDANTIC) $(OHM_W_ALL) $(OHM_W_ERROR) -O3
-ohmd_LDADD     = $(XPMEM_LIBS) 
+ohmd_LDADD     = $(XPMEM_LIBS)
+
+if HAVE_MPI
+ohmd_CFLAGS   += $(MPI_CFLAGS)
+ohmd_LDADD    += $(MPI_CLDFLAGS)
+endif
 
 if DEBUG_BUILD
   ohmd_CFLAGS += -g -O0
