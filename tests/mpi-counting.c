@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2004-2006 The Trustees of Indiana University and Indiana
- *                         University Research and Technology
- *                         Corporation.  All rights reserved.
- */
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +9,7 @@ int count;
 
 int main(int argc, char* argv[])
 {
+    int init, finalized;
     int rank, size;
 
     if (argc > 1) {
@@ -23,7 +18,10 @@ int main(int argc, char* argv[])
   
     printf("Counting demo starting with pid %d\n", (int)getpid());
 
-    MPI_Init(&argc, &argv);
+    MPI_Initialized(&init);
+    if (!init)
+        MPI_Init(&argc, &argv);
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     for (count = 0; count < limit; ++count) {
@@ -33,7 +31,10 @@ int main(int argc, char* argv[])
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
+
+    MPI_Finalized(&finalized);
+    if (!finalized)
+        MPI_Finalize();
 
     return 0;
 }
