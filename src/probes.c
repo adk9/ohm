@@ -212,7 +212,6 @@ new_probe(char *name) {
             free(pname);
             if (ref)
                 free(ref);
-            free(ref);
             return NULL;
         }
     }
