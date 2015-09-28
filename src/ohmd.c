@@ -328,11 +328,10 @@ static addr_t
 _get_probe_var_addr(variable_t *var) {
     unw_word_t ip, ptr;
     unw_cursor_t cur;
-    addr_t addr = 0;
 
     switch (var->loctype) {
         case OHM_ADDRESS:
-            addr = var->addr;
+            return var->addr;
             break;
 
         default:
@@ -353,12 +352,12 @@ _get_probe_var_addr(variable_t *var) {
                     } else
                         derror("don't know how to read probe, skipping...");
                     // copy it to the Lua Land.
-                    addr = ptr;
+                    return ptr;
                 }
             } while (!in_main(ip) && (unw_step(&cur) > 0));
             break;
     }
-    return addr;
+    return 0;
 }
 
 
@@ -376,6 +375,9 @@ probe(void *arg)
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
         addr_t addr = _get_probe_var_addr(p->var);
+        if (!addr)
+            continue;
+
         if (write_lua(p, addr, arg) < 0)
             derror("error in probe, skipping...");
     }
