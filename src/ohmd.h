@@ -25,7 +25,7 @@ typedef unsigned long addr_t;
 
 /* Types (base types and aggregate types) */
 
-#define OHM_MAX_NUM_TYPES       256
+#define OHM_MAX_NUM_TYPES       2048
 
 // OHM types.
 #define OHM_TYPE_UNSIGNED  (1<<0)
@@ -80,7 +80,7 @@ int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die di
 
 /* Functions */
 
-#define OHM_MAX_NUM_FUNCTIONS   1024
+#define OHM_MAX_NUM_FUNCTIONS   4096
 
 typedef struct function_t function_t;
 struct function_t
@@ -120,7 +120,7 @@ void print_all_functions(void);
 
 /* Variables */
 
-#define OHM_MAX_NUM_VARS        1024
+#define OHM_MAX_NUM_VARS        4096
 
 typedef struct variable_t variable_t;
 struct variable_t
