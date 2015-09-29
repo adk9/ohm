@@ -1,6 +1,6 @@
 bin_PROGRAMS   = ohmd
 
-ohmd_SOURCES   = ohmd.c dwarf-util.c lua-util.c types.c funcvars.c probes.c
+ohmd_SOURCES   = dwarf-util.c lua-util.c types.c funcvars.c probes.c ohmd.c
 
 if ENABLE_XPMEM
 ohmd_SOURCES  += xpmem.c
