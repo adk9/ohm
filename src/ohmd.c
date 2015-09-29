@@ -58,10 +58,8 @@ static lua_State *L;
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
 
-#if HAVE_MPI
 int mpi_rank;
 int mpi_size;
-#endif
 
 // Forward declaration
 static addr_t _get_probe_var_addr(variable_t *var);
