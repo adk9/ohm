@@ -54,10 +54,14 @@ int           ohm_debug;
 // Global Lua state
 static lua_State *L;
 
-
 // Global unwind state
 static unw_addr_space_t unw_addrspace;
 static unw_cursor_t     unw_cursor;
+
+#if HAVE_MPI
+int mpi_rank;
+int mpi_size;
+#endif
 
 // Forward declaration
 static addr_t _get_probe_var_addr(variable_t *var);
@@ -408,11 +412,24 @@ int main(int argc, char *argv[])
     struct timespec ts;
     void *upt_info;
 
+#ifdef HAVE_MPI
+    int init;
+    MPI_Initialized(&init);
+    if (!init)
+        MPI_Init(&argc, &argv);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+#else
+    mpi_rank = 0;
+    mpi_size = 0;
+#endif      
+
     ohmfile = DEFAULT_OHMFILE;
     while ((c = getopt(argc, argv, "Do:i:h")) != -1) {
         switch (c) {
             case 'D':
-                ohm_debug = 1;
+                ohm_debug = (mpi_rank == 0);
                 break;
             case 'o':
                 ohmfile = optarg;
@@ -558,6 +575,13 @@ int main(int argc, char *argv[])
 
 #if HAVE_XPMEM
     xpmem_detach_mem();
+#endif
+
+#ifdef HAVE_MPI
+    int finalized;
+    MPI_Finalized(&finalized);
+    if (!finalized)
+        MPI_Finalize();
 #endif
     probe_finalize();
     return 0;
