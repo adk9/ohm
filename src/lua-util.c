@@ -41,11 +41,17 @@ lua_pushbuf(lua_State *L, basetype_t *type, void *val)
         case OHM_TYPE_PTR:
             lua_pushnumber(L, *((unsigned long *) val));
             break;
-        case OHM_TYPE_LONG_INT:
-            lua_pushnumber(L, *((long int *) val));
+        case OHM_TYPE_LONG_LONG:
+            lua_pushnumber(L, *((long long int *) val));
             break;
-        case OHM_TYPE_LONG_UINT:
-            lua_pushnumber(L, *((long unsigned int *) val));
+        case OHM_TYPE_LONG_ULONG:
+            lua_pushnumber(L, *((unsigned long long *) val));
+            break;
+        case OHM_TYPE_SHORT_INT:
+            lua_pushnumber(L, *((short int *) val));
+            break;
+        case OHM_TYPE_SHORT_UINT:
+            lua_pushnumber(L, *((short unsigned int *) val));
             break;
         default:
             derror("invalid probe data type (%d).", type->ohm_type);

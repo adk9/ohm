@@ -51,7 +51,7 @@ get_type_size(basetype_t *type)
     if (!type)
         return 0;
 
-    if (is_alias(type->ohm_type) && type->elems)
+    if (is_alias(type->ohm_type) && type->elems && type->elems[0])
         return get_type_size(type->elems[0]);
 
     return type->size;
@@ -63,7 +63,7 @@ get_type_nelem(basetype_t *type)
     if (!type)
         return 0;
 
-    if (is_alias(type->ohm_type) && type->elems)
+    if (is_alias(type->ohm_type) && type->elems && type->elems[0])
         return get_type_nelem(type->elems[0]);
 
     return type->nelem;
@@ -100,22 +100,35 @@ get_type_ohmtype(basetype_t *type)
         return OHM_TYPE_DOUBLE;
     else if (!strcmp(type->name, "float"))
         return OHM_TYPE_FLOAT;
-    else if (!strcmp(type->name, "char"))
+    else if (!strcmp(type->name, "char") ||
+             !strcmp(type->name, "signed char"))
         return OHM_TYPE_CHAR;
     else if (!strcmp(type->name, "unsigned char"))
         return OHM_TYPE_UCHAR;
-    else if (!strcmp(type->name, "long"))
+    else if (!strcmp(type->name, "long") ||
+             !strcmp(type->name, "long int"))
         return OHM_TYPE_LONG;
-    else if (!strcmp(type->name, "unsigned long"))
+    else if (!strcmp(type->name, "unsigned long") ||
+             !strcmp(type->name, "sizetype") ||
+             !strcmp(type->name, "long unsigned int"))
         return OHM_TYPE_ULONG;
     else if (!strcmp(type->name, "ptr"))
         return OHM_TYPE_PTR;
-    else if (!strcmp(type->name, "long int"))
-        return OHM_TYPE_LONG_INT;
-    else if (!strcmp(type->name, "long unsigned int"))
-        return OHM_TYPE_LONG_UINT;
-    else
-        return OHM_TYPE_DOUBLE;
+    else if (!strcmp(type->name, "long long") ||
+             !strcmp(type->name, "long long int"))
+        return OHM_TYPE_LONG_LONG;
+    else if (!strcmp(type->name, "unsigned long long") ||
+             !strcmp(type->name, "unsigned long long int") ||
+             !strcmp(type->name, "long long unsigned int"))
+        return OHM_TYPE_LONG_ULONG;
+    else if (!strcmp(type->name, "short int"))
+        return OHM_TYPE_SHORT_INT;
+    else if (!strcmp(type->name, "short unsigned int"))
+        return OHM_TYPE_SHORT_UINT;
+    else {
+        derror("invalid probe data type: %s.", type->name);
+        exit(EXIT_FAILURE);
+    }
 }
 
 static int

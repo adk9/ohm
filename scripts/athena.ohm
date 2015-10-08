@@ -1,0 +1,4 @@
+mesh  = probe {"main.Mesh", 1.0}
+dt_done  = probe {"main.dt_done", 1.0}
+
+rule{mesh} { function () print("cycle=" .. mesh[1]["nstep"] .. " time=" .. mesh[1]["time"] .. "next dt=" .. mesh[1]["dt"] .. "last dt=" .. dt_done[1]) end }

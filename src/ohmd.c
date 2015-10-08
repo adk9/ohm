@@ -213,6 +213,45 @@ remote_copy(void *dst, void *src, size_t size, void *arg)
     return ret;
 }
 
+static void
+push_lua(basetype_t *t, void *buf)
+{
+    int i;
+    basetype_t *ot;
+
+    if (is_array(t->ohm_type)) {
+        for (i = 0; i < get_type_nelem(t); i++) {
+            lua_newtable(L);
+
+            ot = get_type_alias(t->elems[0]);
+            if (get_type_nelem(ot) > 1)
+                push_lua(ot, buf);
+            else {
+                lua_pushnumber(L, i+1);
+                lua_pushbuf(L, ot, buf+(i*get_type_size(ot)));
+                lua_rawset(L, -3);
+            }
+        }
+    } else if (is_struct(t->ohm_type)) {
+        for (i = 0; i < get_type_nelem(t); i++) {
+            lua_newtable(L);
+
+            ot = get_type_alias(t->elems[i]);
+            if (get_type_nelem(ot) > 1)
+                push_lua(ot, buf);
+            else {
+                ddebug("type: %s[%d] %lu (TID %d, type %d)::: %s",
+                       ot->name, ot->nelem, ot->size, ot->id, ot->ohm_type,
+                       t->elems[i]->name);
+                lua_pushstring(L, t->elems[i]->name);
+                lua_pushbuf(L, ot, buf+(i*get_type_size(ot)));
+                lua_rawset(L, -3);
+            }
+        }
+    } else
+        lua_pushbuf(L, t, buf);
+}
+
 static int
 write_lua(probe_t *probe, addr_t addr, void *arg)
 {
