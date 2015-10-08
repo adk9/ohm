@@ -14,12 +14,12 @@ function probe (p)
    return pprobe
 end
 
-function rule (r)
-   -- check if all rule arguments are tables or not
-   for _,v in pairs(r) do
-      if type(v) ~= "table" then error("invalid probe in rule arguments") end
+function event (e)
+   -- check if all event arguments are tables or not
+   for _,v in pairs(e) do
+      if type(v) ~= "table" then error("invalid probe in event arguments") end
    end
-   return function (h) for _,v in pairs(r) do table.insert(v.handlers, h[1]) end end
+   return function (h) for _,v in pairs(e) do table.insert(v.handlers, h[1]) end end
 end
 
 function ohm_add (tuples)

@@ -3,11 +3,11 @@ COUNT  = probe {"ctr->limit", 1.0}
 
 FOO  = probe {"foo[index:]", 1.0}
 
--- rule{CTR} { function () print("OHM count = " .. CTR[1]["count"] .. " -- limit = " .. CTR[1]["limit"] .. " pcount = " .. CTR[1]["pcount"]) end }
+-- event{CTR} { function () print("OHM count = " .. CTR[1]["count"] .. " -- limit = " .. CTR[1]["limit"] .. " pcount = " .. CTR[1]["pcount"]) end }
 
-rule{COUNT} { function () print("ctr->limit = " .. COUNT[1]) end }
+event{COUNT} { function () print("ctr->limit = " .. COUNT[1]) end }
 
-rule{FOO} { function ()
+event{FOO} { function ()
   for key,value in pairs(FOO[1]) do
     print("foo[" .. key .. "] = " .. value)
   end

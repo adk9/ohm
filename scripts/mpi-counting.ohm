@@ -3,7 +3,7 @@ limit = probe {"limit", 1.0}
 rank  = probe {"main.rank", 1.0}
 size  = probe {"main.size", 1.0}
 
-rule{count} {
+event{count} {
    function ()
       print("count = " .. count[1] ..
             " limit = " .. limit[1] ..
