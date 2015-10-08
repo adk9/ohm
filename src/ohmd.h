@@ -153,11 +153,19 @@ void print_all_variables(void);
 #define OHM_PTR_ADDR   (1<<2) // address of a pointer, e.g. &x
 #define  OHM_ARR_IND   (1<<3) // array index, e.g. x[5]
 #define OHM_STRUCT_MEM (1<<4) // member of a struct ptr, e.g. x->y
+#define OHM_CUR_TICK   (1<<5) // sample count, #i
+#define OHM_CUR_FRAME  (1<<6) // current frame, #f
+#define OHM_BACKTRACE  (1<<7) // current frame, #b
 
 #define    is_deref(v)    ((v) & OHM_DEREF)
 #define is_ptr_addr(v)    ((v) & OHM_PTR_ADDR)
 #define  is_arr_ind(v)    ((v) & OHM_ARR_IND)
 #define  is_struct_mem(v) ((v) & OHM_STRUCT_MEM)
+#define  is_cur_tick(v)   ((v) & OHM_CUR_TICK)
+#define  is_cur_frame(v)  ((v) & OHM_CUR_FRAME)
+#define  is_backtrace(v)  ((v) & OHM_BACKTRACE)
+
+#define is_builtin_probe(v) (is_cur_tick(v) && is_cur_frame(v) && is_backtrace(v))
 
 typedef struct probe_t probe_t;
 struct probe_t

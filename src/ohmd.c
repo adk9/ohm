@@ -61,6 +61,8 @@ static unw_cursor_t     unw_cursor;
 int mpi_rank;
 int mpi_size;
 
+int cur_tick;
+
 // Forward declaration
 static addr_t _get_probe_var_addr(variable_t *var);
 
@@ -220,10 +222,19 @@ write_lua(probe_t *probe, addr_t addr, void *arg)
     size_t elem_size;
     addr_t iaddr;
 
-    if (!probe || !probe->var)
+    if (!probe)
         return -1;
 
-    if (is_ptr_addr(probe->type)) {
+    if (!is_builtin_probe(probe->type) && !probe->var)
+        return -1;
+
+    if (is_cur_tick(probe->type)) {
+        memcpy(probe->buf, &cur_tick, sizeof(cur_tick));
+    } else if (is_cur_frame(probe->type)) {
+        printf("not implemented.");
+    } else if (is_backtrace(probe->type)) {
+        printf("not implemented.");
+    } else if (is_ptr_addr(probe->type)) {
         memcpy(probe->buf, &addr, sizeof(addr));
     } else {
         t = get_type_alias(probe->var->type);
@@ -331,6 +342,10 @@ _get_probe_var_addr(variable_t *var) {
     unw_word_t ip, ptr;
     unw_cursor_t cur;
 
+    if (!var) {
+        return 0;
+    }
+
     switch (var->loctype) {
         case OHM_ADDRESS:
             return var->addr;
@@ -377,7 +392,7 @@ probe(void *arg)
     lua_newtable(L);
     for (p = probes_list; p != NULL; p = p->next) {
         addr_t addr = _get_probe_var_addr(p->var);
-        if (!addr)
+        if (!addr && !is_builtin_probe(p->type))
             continue;
 
         if (write_lua(p, addr, arg) < 0)
@@ -388,6 +403,7 @@ probe(void *arg)
         derror("error adding value: %s\n", lua_tostring(L, -1));
         return;
     }
+    ++cur_tick;
 }
 
 void ohm_cleanup(int sig)
@@ -409,6 +425,8 @@ int main(int argc, char *argv[])
     int c, ret, status;
     struct timespec ts;
     void *upt_info;
+
+    cur_tick = 0;
 
 #ifdef HAVE_MPI
     int init;

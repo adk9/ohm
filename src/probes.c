@@ -71,17 +71,26 @@ static int _set_probe_type(probe_t *p, char *name, char **pvar, char **ref) {
     p->lower = NULL;
     p->upper = NULL;
 
-    char *pname = strchr(name, '*');
-    if (pname != NULL) {
+    char *pname;
+
+    if ((pname = strchr(name, '*')) != NULL) {
         p->type = OHM_DEREF;
         *pvar = strdup(pname+1);
         return 1;
-    }
-
-    pname = strchr(name, '&');
-    if (pname != NULL) {
+    } else if ((pname = strchr(name, '&')) != NULL) {
         p->type = OHM_PTR_ADDR;
         *pvar = strdup(pname+1);
+        return 1;
+    } else if ((pname = strchr(name, '#')) != NULL) {
+        if (!strcmp(pname+1, "t") || !strcmp(pname+1, "tick")) {
+            p->type = OHM_CUR_TICK;
+        } else if (!strcmp(pname+1, "f") || !strcmp(pname+1, "frame")) {
+            p->type = OHM_CUR_FRAME;
+        } else if (!strcmp(pname+1, "b") || !strcmp(pname+1, "backtrace")) {
+            p->type = OHM_BACKTRACE;
+        }
+
+        *pvar = NULL;
         return 1;
     }
 
@@ -146,17 +155,30 @@ static int _set_probe_type(probe_t *p, char *name, char **pvar, char **ref) {
 // var: the variable corresponding to the probe
 // active: if the probe is active or not
 static int _activate_probe(probe_t *p, variable_t *var, bool active, char *ref) {
-    if (!var)
-        return -1;
-
     p->var = var;
     // we allocate a temporary buffer for the probe data here
-    if (!var->type) {
-        ddebug("invalid type. Skipping probe %s...", p->name);
-        return -1;
+
+    size_t ts = 0;
+    if (var->type) {
+        ts = get_type_size(var->type);
+    } else {
+        switch (p->type) {
+            case OHM_CUR_TICK:
+                ts = sizeof(int);
+                break;
+            case OHM_CUR_FRAME:
+                ts = 256;
+                break;
+            case OHM_BACKTRACE:
+                ts = 256 * 12;
+                break;
+            default:
+                ddebug("invalid type size. Skipping probe %s...", p->name);
+                return -1;
+        }
     }
 
-    p->buf = calloc(get_type_size(var->type), 1);
+    p->buf = calloc(ts, 1);
     if (!p->buf) {
         ddebug("could not figure out the type size. Skipping probe %s...", p->name);
         return -1;
@@ -201,20 +223,24 @@ new_probe(char *name) {
     _set_probe_type(p, name_, &pname, &ref);
     free(name_);
 
-    variable_t *v = get_variable(pname);
-    if (!v) {
-        // if it is not a variable, check whether a function probe
-        // is requested.
-        function_t *f = get_function(pname);
-        if (!f) {
-            ddebug("Skipping non-existent probe %s.", pname);
-            free(p);
-            free(pname);
-            if (ref)
-                free(ref);
-            return NULL;
+    variable_t *v = NULL;
+    if (!is_builtin_probe(p->type)) {
+        v = get_variable(pname);
+        if (!v) {
+            // if it is not a variable, check whether a function probe
+            // is requested.
+            function_t *f = get_function(pname);
+            if (!f) {
+                ddebug("Skipping non-existent probe %s.", pname);
+                free(p);
+                free(pname);
+                if (ref)
+                    free(ref);
+                return NULL;
+            }
         }
     }
+
     if (_activate_probe(p, v, 1, ref) < 0) {
         free(p);
         free(pname);
