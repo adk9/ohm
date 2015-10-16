@@ -39,6 +39,14 @@ position Rp[Npartmax], Rnew[Npartmax];
 double boxsize;
 double dt, tmin, tmax;      // time grid
 
+// current time-step
+static int cur_ts;
+
+// total time-steps
+static int total_ts;
+
+#define ONE_LARGE_ERROR  1
+#define ERROR_PERCENT 0.05  // 1%
 
                             // gaussian distributed random 
                             // numbers - Koonin & Meredith 1986
@@ -341,6 +349,20 @@ time_step_verlet( int iprint )
   int i, j;
                             // accelerations at t
   accelerations( iprint );
+
+  if (ONE_LARGE_ERROR) {
+    if ((((double)2.5*cur_ts)/total_ts) == 1.0) {
+      acc[0].ax *= 3;
+      acc[0].ay *= 3; 
+      acc[0].az /= 3;
+    }
+  } else {
+    if (cur_ts % (int)(total_ts/((double)ERROR_PERCENT * total_ts)) == 0) {
+      acc[0].ax += ((double)rand()/(double)RAND_MAX);
+      acc[0].ay += ((double)rand()/(double)RAND_MAX);
+      acc[0].az -= ((double)rand()/(double)RAND_MAX);
+    }
+  }
                             // basic Verlet
   for ( i=0 ; i<Npart ; i++ )
     {
@@ -471,6 +493,9 @@ int main( int argn, char * argv[] )
 	}
     }
 
+  cur_ts = 0;
+  total_ts = tmax / dt;
+
                         // information
   printf( "\n Npart: %d tmax %f\n", Npart, tmax ); 
                         // recording trajectories in file
@@ -495,6 +520,7 @@ int main( int argn, char * argv[] )
                         // time step -- velocity-verlet
       time_step_verlet( dbg_print );
       t = t + dt;
+      cur_ts++;
                         // record positions
       record_trajectories( );
                         // optional energy
