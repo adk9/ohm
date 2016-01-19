@@ -11,6 +11,9 @@
 
 #define Npartmax 2000    // dimension of arrays ( Npart < Npartmax )
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
 
 typedef struct{
   double x, y, z;
@@ -344,7 +347,7 @@ void accelerations( int iprint )
 
 
                             // Velocity Verlet time step
-time_step_verlet( int iprint )
+void time_step_verlet( int iprint )
 {
   int i, j;
                             // accelerations at t
