@@ -213,6 +213,7 @@ remote_copy(void *dst, void *src, size_t size, void *arg)
     return ret;
 }
 
+#if 0
 static void
 push_lua(basetype_t *t, void *buf)
 {
@@ -251,6 +252,7 @@ push_lua(basetype_t *t, void *buf)
     } else
         lua_pushbuf(L, t, buf);
 }
+#endif
 
 static int
 write_lua(probe_t *probe, addr_t addr, void *arg)

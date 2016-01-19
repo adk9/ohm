@@ -70,11 +70,11 @@ extern unsigned int types_table_size;
 
 basetype_t* get_type(int id);
 basetype_t* get_or_add_type(int id);
-inline size_t get_type_size(basetype_t *type);
-inline unsigned int get_type_nelem(basetype_t *type);
-inline basetype_t* get_type_alias(basetype_t *type);
-inline basetype_t* get_type_ptr(basetype_t *type);
-inline int get_type_ohmtype(basetype_t *type);
+size_t get_type_size(basetype_t *type);
+unsigned int get_type_nelem(basetype_t *type);
+basetype_t* get_type_alias(basetype_t *type);
+basetype_t* get_type_ptr(basetype_t *type);
+int get_type_ohmtype(basetype_t *type);
 int add_basetype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
 int add_complextype_from_die(Dwarf_Debug dbg, Dwarf_Die parent_die, Dwarf_Die die);
 
@@ -99,8 +99,8 @@ extern function_t  *main_fn;
 
 function_t* get_function(char *name);
 void refresh_compound_sizes(void);
-inline int in_function(function_t *f, unsigned long ip);
-inline int in_main(unsigned long ip);
+int in_function(function_t *f, unsigned long ip);
+int in_main(unsigned long ip);
 void print_all_functions(void);
 
 /**********************************************************************/
@@ -230,7 +230,7 @@ int traverse_die(dwarf_query_cb_t cb, Dwarf_Debug dbg, Dwarf_Die parent_die,
 
 /* Lua utility functions. */
 
-inline void lua_pushbuf(lua_State *L, basetype_t *type, void *val);
+void lua_pushbuf(lua_State *L, basetype_t *type, void *val);
 
 /**********************************************************************/
 
