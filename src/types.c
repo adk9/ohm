@@ -92,16 +92,21 @@ get_type_ohmtype(basetype_t *type)
     if (!type)
         return -1;
 
-    if (!strcmp(type->name, "int"))
+    if (!strcmp(type->name, "int") ||
+        !strcmp(type->name, "integer(kind=4)") ||
+        !strcmp(type->name, "logical(kind=4)"))
         return OHM_TYPE_INT;
     else if (!strcmp(type->name, "unsigned int"))
         return OHM_TYPE_UINT;
-    else if (!strcmp(type->name, "double"))
+    else if (!strcmp(type->name, "double") ||
+             !strcmp(type->name, "real(kind=8)"))
         return OHM_TYPE_DOUBLE;
-    else if (!strcmp(type->name, "float"))
+    else if (!strcmp(type->name, "float") ||
+             !strcmp(type->name, "real(kind=4)"))
         return OHM_TYPE_FLOAT;
     else if (!strcmp(type->name, "char") ||
-             !strcmp(type->name, "signed char"))
+             !strcmp(type->name, "signed char") ||
+             !strcmp(type->name, "character(kind=1)"))
         return OHM_TYPE_CHAR;
     else if (!strcmp(type->name, "unsigned char"))
         return OHM_TYPE_UCHAR;
@@ -115,7 +120,8 @@ get_type_ohmtype(basetype_t *type)
     else if (!strcmp(type->name, "ptr"))
         return OHM_TYPE_PTR;
     else if (!strcmp(type->name, "long long") ||
-             !strcmp(type->name, "long long int"))
+             !strcmp(type->name, "long long int") ||
+             !strcmp(type->name, "integer(kind=8)"))
         return OHM_TYPE_LONG_LONG;
     else if (!strcmp(type->name, "unsigned long long") ||
              !strcmp(type->name, "unsigned long long int") ||
