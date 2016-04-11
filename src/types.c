@@ -94,15 +94,21 @@ get_type_ohmtype(basetype_t *type)
 
     if (!strcmp(type->name, "int") ||
         !strcmp(type->name, "integer(kind=4)") ||
-        !strcmp(type->name, "logical(kind=4)"))
+        !strcmp(type->name, "logical(kind=4)") ||
+        !strcmp(type->name, "bool") ||
+        !strcmp(type->name, "_Bool"))
         return OHM_TYPE_INT;
     else if (!strcmp(type->name, "unsigned int"))
         return OHM_TYPE_UINT;
     else if (!strcmp(type->name, "double") ||
-             !strcmp(type->name, "real(kind=8)"))
+             !strcmp(type->name, "real(kind=8)") ||
+             !strcmp(type->name, "long double") ||
+             !strcmp(type->name, "complex double") ||
+             !strcmp(type->name, "complex long double"))
         return OHM_TYPE_DOUBLE;
     else if (!strcmp(type->name, "float") ||
-             !strcmp(type->name, "real(kind=4)"))
+             !strcmp(type->name, "real(kind=4)") ||
+             !strcmp(type->name, "complex float"))
         return OHM_TYPE_FLOAT;
     else if (!strcmp(type->name, "char") ||
              !strcmp(type->name, "signed char") ||
@@ -125,11 +131,14 @@ get_type_ohmtype(basetype_t *type)
         return OHM_TYPE_LONG_LONG;
     else if (!strcmp(type->name, "unsigned long long") ||
              !strcmp(type->name, "unsigned long long int") ||
-             !strcmp(type->name, "long long unsigned int"))
+             !strcmp(type->name, "long long unsigned int") ||
+             !strcmp(type->name, "__int128") ||
+             !strcmp(type->name, "__int128 unsigned"))
         return OHM_TYPE_LONG_ULONG;
     else if (!strcmp(type->name, "short int"))
         return OHM_TYPE_SHORT_INT;
-    else if (!strcmp(type->name, "short unsigned int"))
+    else if (!strcmp(type->name, "short unsigned int") ||
+             !strcmp(type->name, "wchar_t"))
         return OHM_TYPE_SHORT_UINT;
     else {
         derror("invalid probe data type: %s.", type->name);
